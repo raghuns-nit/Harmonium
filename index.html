@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carnatic Multi-Raga Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fcfaf2;
+            color: #333;
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        h2 { color: #d35400; }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            margin-top: 10px;
+            width: 100%;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .keys {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .key {
+            padding: 10px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            background-color: #ecf0f1;
+            width: 55px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            user-select: none;
+            transition: background 0.1s, transform 0.1s;
+        }
+        .key:active, .key.active {
+            background-color: #e67e22;
+            color: white;
+            border-color: #d35400;
+            transform: scale(0.95);
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+            font-family: monospace;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #d35400;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #e67e22; }
+        .note { font-size: 0.9em; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <h2>Carnatic Multi-Raga Player</h2>
+
+    <div class="panel">
+        <label><b>1. Upload Audio Sample:</b></label>
+        <p class="note">Upload your single-note file (e.g., <i>harmonium-kannan-orig.wav</i>).</p>
+        <input type="file" id="audioUpload" accept="audio/*">
+    </div>
+
+    <div class="panel">
+        <label><b>2. Select Raga & Play:</b></label>
+        <p class="note">Choose a Raga. The physical keys (E through P) will instantly remap to the correct Swarasthanas.</p>
+        <select id="ragaSelect" onchange="updateRaga()">
+            <option value="Mayamalavagowla">Mayamalavagowla (S R1 G3 M1 P D1 N3)</option>
+            <option value="Sankarabharanam">Dheerasankarabharanam (S R2 G3 M1 P D2 N3)</option>
+            <option value="Kalyani">Mechakalyani (S R2 G3 M2 P D2 N3)</option>
+            <option value="Kharaharapriya">Kharaharapriya (S R2 G2 M1 P D2 N2)</option>
+            <option value="Thodi">Hanumatodi (S R1 G2 M1 P D1 N2)</option>
+            <option value="Shanmukhapriya">Shanmukhapriya (S R2 G2 M2 P D1 N2)</option>
+        </select>
+        
+        <div class="keys" id="keysContainer">
+            <!-- Keys are injected here by JavaScript -->
+        </div>
+    </div>
+    
+    <div class="panel">
+        <label><b>3. Auto-Play Notation:</b></label>
+        <p class="note">Paste your notation using generic letters (S, R, G, M, P, D, N, S') or absolute (R1, G3). The app will automatically play the correct variations based on your selected Raga above.</p>
+        <textarea id="notationInput">S R G M P D N S'
+S' N D P M G R S</textarea>
+        <button id="playBtn" onclick="playNotation()">Play Notation</button>
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        let audioBuffer = null;
+
+        // Semitone mapping for all 16 Swarasthanas
+        const swaraToSemitone = {
+            'S': 0, 
+            'R1': 1, 'R2': 2, 'R3': 3,
+            'G1': 2, 'G2': 3, 'G3': 4,
+            'M1': 5, 'M2': 6,
+            'P': 7, 
+            'D1': 8, 'D2': 9, 'D3': 10,
+            'N1': 9, 'N2': 10, 'N3': 11,
+            "S'": 12 
+        };
+        
+        // Raga definitions mapped to the 8 physical keys (Arohana/Avarohana basic scale)
+        const ragas = {
+            "Mayamalavagowla": ['S', 'R1', 'G3', 'M1', 'P', 'D1', 'N3', "S'"],
+            "Sankarabharanam": ['S', 'R2', 'G3', 'M1', 'P', 'D2', 'N3', "S'"],
+            "Kalyani": ['S', 'R2', 'G3', 'M2', 'P', 'D2', 'N3', "S'"],
+            "Kharaharapriya": ['S', 'R2', 'G2', 'M1', 'P', 'D2', 'N2', "S'"],
+            "Thodi": ['S', 'R1', 'G2', 'M1', 'P', 'D1', 'N2', "S'"],
+            "Shanmukhapriya": ['S', 'R2', 'G2', 'M2', 'P', 'D1', 'N2', "S'"]
+        };
+
+        const physicalKeys = ['e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+        let activeScale = [];
+        let keyMap = {};
+
+        // File upload handler
+        document.getElementById('audioUpload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const arrayBuffer = await file.arrayBuffer();
+            audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            alert("Audio sample loaded successfully!");
+        });
+
+        // Initialize and update Raga mapping
+        function updateRaga() {
+            const selectedRaga = document.getElementById('ragaSelect').value;
+            activeScale = ragas[selectedRaga];
+            keyMap = {};
+            
+            const container = document.getElementById('keysContainer');
+            container.innerHTML = '';
+
+            for (let i = 0; i < physicalKeys.length; i++) {
+                let physKey = physicalKeys[i];
+                let swara = activeScale[i];
+                keyMap[physKey] = swara;
+                
+                let btn = document.createElement('div');
+                btn.className = 'key';
+                btn.setAttribute('data-key', physKey);
+                btn.innerHTML = `${physKey.toUpperCase()}<br>(${swara})`;
+                btn.onclick = () => playSwara(swara, physKey);
+                container.appendChild(btn);
+            }
+        }
+
+        // Core playback function
+        function playSwara(swara, physKey = null) {
+            if (!audioBuffer) {
+                alert("Please upload an audio sample first!");
+                return;
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const semitoneOffset = swaraToSemitone[swara];
+            if (semitoneOffset === undefined) return;
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.playbackRate.value = Math.pow(2, semitoneOffset / 12);
+            source.connect(audioCtx.destination);
+            source.start(0);
+
+            if (physKey) highlightKey(physKey);
+        }
+
+        // Auto-play notation text
+        async function playNotation() {
+            if (!audioBuffer) {
+                alert("Please upload an audio sample first!");
+                return;
+            }
+            
+            const text = document.getElementById('notationInput').value.toUpperCase();
+            
+            // Regex to catch exact swaras (R1) OR generic swaras (R)
+            const regex = /\b(S'|S|R1|R2|R3|R|G1|G2|G3|G|M1|M2|M|P|D1|D2|D3|D|N1|N2|N3|N)\b/g;
+            const rawNotes = text.match(regex); 
+            
+            if (!rawNotes) {
+                alert("No valid swaras found.");
+                return;
+            }
+            
+            const playButton = document.getElementById('playBtn');
+            playButton.disabled = true;
+            playButton.innerText = "Playing...";
+
+            for (let note of rawNotes) {
+                let resolvedSwara = note;
+
+                // Translate generic notation to specific Raga note
+                if (note === 'R') resolvedSwara = activeScale[1];
+                if (note === 'G') resolvedSwara = activeScale[2];
+                if (note === 'M') resolvedSwara = activeScale[3];
+                if (note === 'D') resolvedSwara = activeScale[5];
+                if (note === 'N') resolvedSwara = activeScale[6];
+
+                // Find which physical key matches this swara to highlight UI
+                let targetKey = Object.keys(keyMap).find(k => keyMap[k] === resolvedSwara);
+                
+                playSwara(resolvedSwara, targetKey);
+                await new Promise(resolve => setTimeout(resolve, 500)); 
+            }
+
+            playButton.disabled = false;
+            playButton.innerText = "Play Notation";
+        }
+
+        // UI Feedback
+        function highlightKey(physKey) {
+            const btn = document.querySelector(`.key[data-key="${physKey}"]`);
+            if (btn) {
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 250);
+            }
+        }
+
+        // Keyboard listener
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat || document.activeElement.tagName === "TEXTAREA") return;
+            const key = e.key.toLowerCase();
+            if (keyMap[key]) {
+                playSwara(keyMap[key], key);
+            }
+        });
+
+        // Initialize default raga on load
+        window.onload = updateRaga;
+    </script>
+</body>
+</html>
