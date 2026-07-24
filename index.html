@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Carnatic Swara Player</title>
+    <title>Ultimate Carnatic Harmonium</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #fcfaf2;
             color: #333;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
             text-align: center;
         }
-        h2 { color: #d35400; }
+        h2 { color: #d35400; margin-bottom: 5px; }
+        .status-bar { font-size: 0.9em; font-weight: bold; color: #e67e22; margin-bottom: 20px; }
         .panel {
             background: white;
             padding: 15px;
@@ -23,8 +24,8 @@
             margin-bottom: 20px;
             text-align: left;
         }
-        select, input[type="file"] {
-            padding: 8px;
+        input[type="text"], input[type="file"] {
+            padding: 10px;
             font-size: 16px;
             margin-top: 10px;
             width: 100%;
@@ -45,17 +46,11 @@
         }
         button:hover { background-color: #e67e22; }
         button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .note { font-size: 0.9em; color: #7f8c8d; margin-bottom: 5px; }
         
-        .note { font-size: 0.9em; color: #7f8c8d; }
-        
-        /* Keyboard Toggle */
-        .toggle-btn {
-            background-color: #2980b9;
-            width: 100%;
-            font-weight: bold;
-        }
+        .toggle-btn { background-color: #2980b9; width: 100%; font-weight: bold; }
 
-        /* Few Keys (8-Key Layout) */
+        /* Few Keys (Raga Specific Layout) */
         .keys-few {
             display: flex;
             justify-content: center;
@@ -78,57 +73,52 @@
         }
         .key-few:active, .key-few.active { background-color: #e67e22; color: white; }
 
-        /* Full Keyboard Layout (Mobile Optimized) */
-        .keys-full {
-            display: none; /* Hidden by default */
-            position: relative;
-            height: 150px;
-            margin-top: 15px;
+        /* 3-Octave Full Keyboard Layout */
+        .keys-full-wrapper {
+            display: none; 
             width: 100%;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
             overflow-x: auto;
-            white-space: nowrap;
+            margin-top: 15px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            background: #222;
+        }
+        .keys-full {
+            display: flex;
+            position: relative;
+            height: 180px;
+            width: 1050px; /* Wide enough for 3 octaves (21 white keys * 50px) */
         }
         .key-white {
-            display: inline-block;
-            width: 12.5%;
+            width: 50px;
             height: 100%;
             background: white;
             border: 1px solid #333;
             box-sizing: border-box;
             position: relative;
-            vertical-align: top;
             cursor: pointer;
             touch-action: none;
             border-radius: 0 0 4px 4px;
+            flex-shrink: 0;
         }
         .key-black {
             position: absolute;
-            width: 8%;
+            width: 30px;
             height: 60%;
             background: black;
             color: white;
             z-index: 2;
             top: 0;
-            margin-left: -4%;
             cursor: pointer;
             touch-action: none;
             border-radius: 0 0 4px 4px;
             text-align: center;
-            font-size: 0.8em;
+            font-size: 0.7em;
             padding-top: 10px;
         }
         .key-white.active { background: #e67e22; }
         .key-black.active { background: #d35400; }
-        .key-label {
-            position: absolute;
-            bottom: 10px;
-            width: 100%;
-            text-align: center;
-            font-weight: bold;
-        }
+        .key-label { position: absolute; bottom: 10px; width: 100%; text-align: center; font-weight: bold; font-size: 0.8em; color: #555; pointer-events: none;}
 
         textarea {
             width: 100%;
@@ -146,45 +136,31 @@
 </head>
 <body>
 
-    <h2>Ultimate Carnatic Swara Player</h2>
+    <h2>Ultimate Carnatic Harmonium</h2>
+    <div class="status-bar" id="audioStatus">Loading harmonium-kannan-orig.wav in background...</div>
 
     <div class="panel">
-        <label><b>1. Initialize Engine:</b></label>
-        <p class="note">Click below to fetch <i>harmonium-kannan-orig.wav</i> from the repository and unlock audio.</p>
-        <button id="initBtn" onclick="initAudio()">Load Audio & Start</button>
-        <span id="audioStatus" style="margin-left: 10px; font-weight: bold; color: #c0392b;">Not Loaded</span>
-    </div>
-
-    <div class="panel">
-        <label><b>2. Select Raga & Play:</b></label>
-        <select id="ragaSelect" onchange="updateRaga()"></select>
+        <label><b>1. Select Raga:</b></label>
+        <p class="note">Search for a Melakarta or Janya raga. Arohana & Avarohana will populate automatically.</p>
+        <input type="text" id="ragaSearch" list="ragaList" placeholder="Type to search ragas (e.g., Kalyani, Mohanam)..." onchange="selectRaga()">
+        <datalist id="ragaList"></datalist>
         
-        <button class="toggle-btn" onclick="toggleKeyboard()">Toggle: Few Keys / Full Keyboard</button>
+        <button class="toggle-btn" onclick="toggleKeyboard()">Toggle: Raga Swaras (7 keys) / 3-Octave Harmonium</button>
 
-        <!-- 8-Key Layout -->
+        <!-- 7-Key Raga Layout -->
         <div class="keys-few" id="fewKeysContainer"></div>
 
-        <!-- Full Piano-style Layout -->
-        <div class="keys-full" id="fullKeysContainer">
-            <div class="key-white" data-swara="S" onmousedown="startNote('S')" onmouseup="stopNote('S')" onmouseleave="stopNote('S')" ontouchstart="startNote('S'); event.preventDefault();" ontouchend="stopNote('S')"><div class="key-label">S<br>(e)</div></div>
-            <div class="key-black" data-swara="R1" style="left: 12.5%" onmousedown="startNote('R1')" onmouseup="stopNote('R1')" onmouseleave="stopNote('R1')" ontouchstart="startNote('R1'); event.preventDefault();" ontouchend="stopNote('R1')">R1</div>
-            <div class="key-white" data-swara="R2" onmousedown="startNote('R2')" onmouseup="stopNote('R2')" onmouseleave="stopNote('R2')" ontouchstart="startNote('R2'); event.preventDefault();" ontouchend="stopNote('R2')"><div class="key-label">R2<br>(r)</div></div>
-            <div class="key-black" data-swara="G2" style="left: 25%" onmousedown="startNote('G2')" onmouseup="stopNote('G2')" onmouseleave="stopNote('G2')" ontouchstart="startNote('G2'); event.preventDefault();" ontouchend="stopNote('G2')">G2</div>
-            <div class="key-white" data-swara="G3" onmousedown="startNote('G3')" onmouseup="stopNote('G3')" onmouseleave="stopNote('G3')" ontouchstart="startNote('G3'); event.preventDefault();" ontouchend="stopNote('G3')"><div class="key-label">G3<br>(t)</div></div>
-            <div class="key-white" data-swara="M1" onmousedown="startNote('M1')" onmouseup="stopNote('M1')" onmouseleave="stopNote('M1')" ontouchstart="startNote('M1'); event.preventDefault();" ontouchend="stopNote('M1')"><div class="key-label">M1<br>(y)</div></div>
-            <div class="key-black" data-swara="M2" style="left: 50%" onmousedown="startNote('M2')" onmouseup="stopNote('M2')" onmouseleave="stopNote('M2')" ontouchstart="startNote('M2'); event.preventDefault();" ontouchend="stopNote('M2')">M2</div>
-            <div class="key-white" data-swara="P" onmousedown="startNote('P')" onmouseup="stopNote('P')" onmouseleave="stopNote('P')" ontouchstart="startNote('P'); event.preventDefault();" ontouchend="stopNote('P')"><div class="key-label">P<br>(u)</div></div>
-            <div class="key-black" data-swara="D1" style="left: 62.5%" onmousedown="startNote('D1')" onmouseup="stopNote('D1')" onmouseleave="stopNote('D1')" ontouchstart="startNote('D1'); event.preventDefault();" ontouchend="stopNote('D1')">D1</div>
-            <div class="key-white" data-swara="D2" onmousedown="startNote('D2')" onmouseup="stopNote('D2')" onmouseleave="stopNote('D2')" ontouchstart="startNote('D2'); event.preventDefault();" ontouchend="stopNote('D2')"><div class="key-label">D2<br>(i)</div></div>
-            <div class="key-black" data-swara="N2" style="left: 75%" onmousedown="startNote('N2')" onmouseup="stopNote('N2')" onmouseleave="stopNote('N2')" ontouchstart="startNote('N2'); event.preventDefault();" ontouchend="stopNote('N2')">N2</div>
-            <div class="key-white" data-swara="N3" onmousedown="startNote('N3')" onmouseup="stopNote('N3')" onmouseleave="stopNote('N3')" ontouchstart="startNote('N3'); event.preventDefault();" ontouchend="stopNote('N3')"><div class="key-label">N3<br>(o)</div></div>
-            <div class="key-white" data-swara="S'" onmousedown="startNote('S\'')" onmouseup="stopNote('S\'')" onmouseleave="stopNote('S\'')" ontouchstart="startNote('S\''); event.preventDefault();" ontouchend="stopNote('S\'')"><div class="key-label">S'<br>(p)</div></div>
+        <!-- 3-Octave Piano Layout -->
+        <div class="keys-full-wrapper" id="fullKeysContainer">
+            <div class="keys-full" id="pianoScrollArea">
+                <!-- Javascript will inject 3 octaves here -->
+            </div>
         </div>
     </div>
     
     <div class="panel">
-        <label><b>3. Auto-Play Notation File:</b></label>
-        <p class="note">Upload a .txt file with swaras/sahitya, or paste directly into the box. It plays based on the chosen Raga.</p>
+        <label><b>2. Auto-Play Notation File:</b></label>
+        <p class="note">Upload a .txt file or modify the text below. Plays based on the selected Raga.</p>
         <input type="file" id="notationUpload" accept=".txt">
         <textarea id="notationInput">S R G M P D N S'
 S' N D P M G R S</textarea>
@@ -195,19 +171,19 @@ S' N D P M G R S</textarea>
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let audioBuffer = null;
-        let activeNodes = {}; // Tracks playing sounds for NoteOff
+        let activeNodes = {};
 
+        // Base 12 Semitones mapping for absolute calculation
         const swaraToSemitone = {
             'S': 0, 'R1': 1, 'R2': 2, 'R3': 3, 'G1': 2, 'G2': 3, 'G3': 4,
             'M1': 5, 'M2': 6, 'P': 7, 'D1': 8, 'D2': 9, 'D3': 10,
-            'N1': 9, 'N2': 10, 'N3': 11, "S'": 12 
+            'N1': 9, 'N2': 10, 'N3': 11
         };
 
-        const physicalKeys = ['e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+        let ragas = {}; // Will hold all generated and manual ragas
         let activeScale = [];
-        let keyMap = {};
 
-        // 72 Melakarta Generator Algorithm
+        // 1. GENERATE 72 MELAKARTAS
         const melakartaNames = [
             "Kanakangi", "Ratnangi", "Ganamurti", "Vanaspati", "Manavati", "Tanarupi", "Senavati", "Hanumatodi", "Dhenuka", "Natakapriya", "Kokilapriya", "Rupavati",
             "Gayakapriya", "Vakulabharanam", "Mayamalavagowla", "Chakravakam", "Suryakantam", "Hatakambari", "Jhankaradhvani", "Natabhairavi", "Keeravani", "Kharaharapriya", "Gourimanohari", "Varunapriya",
@@ -219,43 +195,66 @@ S' N D P M G R S</textarea>
         
         const purvanga = [['R1','G1'], ['R1','G2'], ['R1','G3'], ['R2','G2'], ['R2','G3'], ['R3','G3']];
         const uttaranga = [['D1','N1'], ['D1','N2'], ['D1','N3'], ['D2','N2'], ['D2','N3'], ['D3','N3']];
-        const ragas = {};
 
-        // Populate Ragas object mathematically
         melakartaNames.forEach((name, index) => {
             let M = index < 36 ? 'M1' : 'M2';
             let p = Math.floor((index % 36) / 6);
             let u = (index % 36) % 6;
-            ragas[name] = ['S', purvanga[p][0], purvanga[p][1], M, 'P', uttaranga[u][0], uttaranga[u][1], "S'"];
+            let aro = `S ${purvanga[p][0]} ${purvanga[p][1]} ${M} P ${uttaranga[u][0]} ${uttaranga[u][1]} S'`;
+            let ava = `S' ${uttaranga[u][1]} ${uttaranga[u][0]} P ${M} ${purvanga[p][1]} ${purvanga[p][0]} S`;
+            ragas[name] = { aro, ava };
         });
 
-        // Populate Dropdown
-        const select = document.getElementById('ragaSelect');
-        melakartaNames.forEach(name => {
+        // 2. ADD POPULAR JANYA RAGAS (Manodharma / Concert Favorites)
+        const janyaRagas = {
+            "Mohanam": { aro: "S R2 G3 P D2 S'", ava: "S' D2 P G3 R2 S" },
+            "Hamsadhvani": { aro: "S R2 G3 P N3 S'", ava: "S' N3 P G3 R2 S" },
+            "Hindolam": { aro: "S G2 M1 D1 N2 S'", ava: "S' N2 D1 M1 G2 S" },
+            "Kambhoji": { aro: "S R2 G3 M1 P D2 S'", ava: "S' N2 D2 P M1 G3 R2 S" },
+            "Vasantha": { aro: "S G3 M1 D2 N3 S'", ava: "S' N3 D2 M1 G3 R1 S" },
+            "Madhyamavati": { aro: "S R2 M1 P N2 S'", ava: "S' N2 P M1 R2 S" },
+            "Abhogi": { aro: "S R2 G2 M1 D2 S'", ava: "S' D2 M1 G2 R2 S" },
+            "Bhairavi": { aro: "S R2 G2 M1 P D2 N2 S'", ava: "S' N2 D1 P M1 G2 R2 S" },
+            "Anandabhairavi": { aro: "S G2 R2 G2 M1 P D2 P S'", ava: "S' N2 D2 P M1 G2 R2 S" },
+            "Sriranjani": { aro: "S R2 G2 M1 D2 N2 S'", ava: "S' N2 D2 M1 G2 R2 S" }
+        };
+        Object.assign(ragas, janyaRagas);
+
+        // Populate Datalist
+        const dataList = document.getElementById('ragaList');
+        Object.keys(ragas).sort().forEach(name => {
             let option = document.createElement('option');
             option.value = name;
-            option.text = `${name} (${ragas[name].join(' ')})`;
-            if (name === "Mayamalavagowla") option.selected = true; // Default
-            select.appendChild(option);
+            dataList.appendChild(option);
         });
 
-        async function initAudio() {
+        // 3. BACKGROUND AUDIO LOADING
+        window.addEventListener('DOMContentLoaded', async () => {
             audioCtx = new AudioContext();
+            build3OctaveKeyboard();
             try {
                 const response = await fetch('harmonium-kannan-orig.wav');
-                if (!response.ok) throw new Error("File not found in repo");
+                if (!response.ok) throw new Error("File not found");
                 const arrayBuffer = await response.arrayBuffer();
                 audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 
-                document.getElementById('audioStatus').innerText = "Ready!";
+                document.getElementById('audioStatus').innerHTML = "Audio Loaded & Ready! &#9989;";
                 document.getElementById('audioStatus').style.color = "#27ae60";
-                document.getElementById('initBtn').disabled = true;
-                updateRaga();
+                
+                // Set default Raga
+                document.getElementById('ragaSearch').value = "Mayamalavagowla";
+                selectRaga();
+                
             } catch (err) {
-                document.getElementById('audioStatus').innerText = "Error: File missing";
-                alert("Could not load 'harmonium-kannan-orig.wav'. Ensure it is in the same directory.");
+                document.getElementById('audioStatus').innerText = "Error: harmonium-kannan-orig.wav not found in directory.";
+                document.getElementById('audioStatus').style.color = "#c0392b";
             }
-        }
+        });
+
+        // Browsers require interaction to resume AudioContext
+        document.body.addEventListener('click', () => { 
+            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
+        });
 
         function toggleKeyboard() {
             const full = document.getElementById('fullKeysContainer');
@@ -266,106 +265,165 @@ S' N D P M G R S</textarea>
             } else {
                 full.style.display = 'block';
                 few.style.display = 'none';
+                // Auto scroll to middle octave
+                full.scrollLeft = 250;
             }
         }
 
-        function updateRaga() {
-            activeScale = ragas[document.getElementById('ragaSelect').value];
-            keyMap = {};
-            
+        function selectRaga() {
+            const ragaName = document.getElementById('ragaSearch').value;
+            if (ragas[ragaName]) {
+                const aro = ragas[ragaName].aro;
+                const ava = ragas[ragaName].ava;
+                document.getElementById('notationInput').value = `${aro}\n${ava}`;
+                
+                // Extract just the unique swaras from Arohana to build the 7-key layout
+                activeScale = aro.replace(/S'/g, '').trim().split(' ');
+                activeScale.push("S'"); // Ensure high Sa is at the end
+                
+                buildFewKeys();
+            }
+        }
+
+        // Build the Raga-Specific 7-8 keys
+        function buildFewKeys() {
             const container = document.getElementById('fewKeysContainer');
             container.innerHTML = '';
+            
+            // Map physical row to whatever the scale length is (QWERTY row)
+            const fallbackKeys = ['e','r','t','y','u','i','o','p','[',']'];
 
-            for (let i = 0; i < physicalKeys.length; i++) {
-                let physKey = physicalKeys[i];
-                let swara = activeScale[i];
-                keyMap[physKey] = swara;
-                
+            activeScale.forEach((swara, index) => {
                 let btn = document.createElement('div');
                 btn.className = 'key-few';
-                btn.setAttribute('data-key', physKey);
-                btn.innerHTML = `${swara}<br>(${physKey.toUpperCase()})`;
+                let triggerKey = fallbackKeys[index] || '';
                 
-                // Touch and Mouse events for Note On/Off
-                btn.onmousedown = () => startNote(swara, physKey);
-                btn.onmouseup = () => stopNote(swara, physKey);
-                btn.onmouseleave = () => stopNote(swara, physKey);
-                btn.ontouchstart = (e) => { e.preventDefault(); startNote(swara, physKey); };
-                btn.ontouchend = () => stopNote(swara, physKey);
+                btn.innerHTML = `${swara}<br>(${triggerKey})`;
+                
+                let baseSwara = swara.replace("'", "");
+                let octaveOffset = swara.includes("'") ? 12 : 0;
+                let semitone = swaraToSemitone[baseSwara] + octaveOffset;
+
+                btn.onmousedown = () => startNote(semitone, btn);
+                btn.onmouseup = () => stopNote(semitone, btn);
+                btn.onmouseleave = () => stopNote(semitone, btn);
+                btn.ontouchstart = (e) => { e.preventDefault(); startNote(semitone, btn); };
+                btn.ontouchend = () => stopNote(semitone, btn);
                 
                 container.appendChild(btn);
-            }
+            });
         }
 
-        function startNote(swara, physKey = null) {
-            if (!audioBuffer) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            // Prevent duplicate plays if key is held down
-            if (activeNodes[swara]) return;
+        // Build the 3-Octave Harmonium Layout (Mandra, Madhya, Tara)
+        function build3OctaveKeyboard() {
+            const container = document.getElementById('pianoScrollArea');
+            const octaves = [
+                { label: 'Mandra', offset: -12 }, 
+                { label: 'Madhya', offset: 0 }, 
+                { label: 'Tara', offset: 12 }
+            ];
+            const pattern = [
+                { type: 'white', swara: 'S', offset: 0 },
+                { type: 'black', swara: 'r1', offset: 1, left: '35px' },
+                { type: 'white', swara: 'R2', offset: 2 },
+                { type: 'black', swara: 'g2', offset: 3, left: '85px' },
+                { type: 'white', swara: 'G3', offset: 4 },
+                { type: 'white', swara: 'M1', offset: 5 },
+                { type: 'black', swara: 'm2', offset: 6, left: '185px' },
+                { type: 'white', swara: 'P', offset: 7 },
+                { type: 'black', swara: 'd1', offset: 8, left: '285px' },
+                { type: 'white', swara: 'D2', offset: 9 },
+                { type: 'black', swara: 'n2', offset: 10, left: '335px' },
+                { type: 'white', swara: 'N3', offset: 11 }
+            ];
 
-            const semitoneOffset = swaraToSemitone[swara];
-            if (semitoneOffset === undefined) return;
+            let absoluteLeft = 0;
+
+            octaves.forEach((oct, octIndex) => {
+                let whiteKeyCount = 0;
+                pattern.forEach((keyDef) => {
+                    let btn = document.createElement('div');
+                    let semitone = keyDef.offset + oct.offset;
+                    
+                    if (keyDef.type === 'white') {
+                        btn.className = 'key-white';
+                        btn.innerHTML = `<div class="key-label">${keyDef.swara}<br>${octIndex === 1 ? '' : oct.label[0]}</div>`;
+                        container.appendChild(btn);
+                        absoluteLeft += 50;
+                        whiteKeyCount++;
+                    } else {
+                        btn.className = 'key-black';
+                        btn.innerHTML = keyDef.swara;
+                        // Calculate black key position relative to total width so far
+                        btn.style.left = `${absoluteLeft - 15}px`;
+                        container.appendChild(btn);
+                    }
+
+                    btn.onmousedown = () => startNote(semitone, btn);
+                    btn.onmouseup = () => stopNote(semitone, btn);
+                    btn.onmouseleave = () => stopNote(semitone, btn);
+                    btn.ontouchstart = (e) => { e.preventDefault(); startNote(semitone, btn); };
+                    btn.ontouchend = () => stopNote(semitone, btn);
+                });
+            });
+            
+            // Add final High Sa for the 3rd octave
+            let finalBtn = document.createElement('div');
+            finalBtn.className = 'key-white';
+            finalBtn.innerHTML = `<div class="key-label">S</div>`;
+            finalBtn.onmousedown = () => startNote(24, finalBtn);
+            finalBtn.onmouseup = () => stopNote(24, finalBtn);
+            finalBtn.onmouseleave = () => stopNote(24, finalBtn);
+            finalBtn.ontouchstart = (e) => { e.preventDefault(); startNote(24, finalBtn); };
+            finalBtn.ontouchend = () => stopNote(24, finalBtn);
+            container.appendChild(finalBtn);
+        }
+
+        // CORE AUDIO PLAYBACK
+        function startNote(semitone, uiElement = null) {
+            if (!audioBuffer) return;
+            if (activeNodes[semitone]) return;
 
             const source = audioCtx.createBufferSource();
             const gainNode = audioCtx.createGain();
             
             source.buffer = audioBuffer;
-            source.playbackRate.value = Math.pow(2, semitoneOffset / 12);
+            source.playbackRate.value = Math.pow(2, semitone / 12); // Pitch shift math
             
             source.connect(gainNode);
             gainNode.connect(audioCtx.destination);
             
             source.start(0);
-            
-            // Save nodes to stop them later
-            activeNodes[swara] = { source, gainNode };
+            activeNodes[semitone] = { source, gainNode };
 
-            if (physKey) {
-                let btn = document.querySelector(`.key-few[data-key="${physKey}"]`);
-                if (btn) btn.classList.add('active');
-            }
-            
-            // Highlight full keyboard
-            let fullKey = document.querySelector(`[data-swara="${swara}"]`);
-            if (fullKey) fullKey.classList.add('active');
+            if (uiElement) uiElement.classList.add('active');
         }
 
-        function stopNote(swara, physKey = null) {
-            if (activeNodes[swara]) {
-                const { source, gainNode } = activeNodes[swara];
-                
-                // Quick fade out (50ms) to prevent audio clicking
+        function stopNote(semitone, uiElement = null) {
+            if (activeNodes[semitone]) {
+                const { source, gainNode } = activeNodes[semitone];
                 gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.015);
                 source.stop(audioCtx.currentTime + 0.1);
-                
-                delete activeNodes[swara];
+                delete activeNodes[semitone];
             }
-
-            if (physKey) {
-                let btn = document.querySelector(`.key-few[data-key="${physKey}"]`);
-                if (btn) btn.classList.remove('active');
-            }
-            let fullKey = document.querySelector(`[data-swara="${swara}"]`);
-            if (fullKey) fullKey.classList.remove('active');
+            if (uiElement) uiElement.classList.remove('active');
         }
 
-        // File upload parsing
+        // AUTO-PLAY NOTATION PARSER
         document.getElementById('notationUpload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(evt) {
-                document.getElementById('notationInput').value = evt.target.result;
-            };
+            reader.onload = function(evt) { document.getElementById('notationInput').value = evt.target.result; };
             reader.readAsText(file);
         });
 
         async function playNotation() {
-            if (!audioBuffer) { alert("Please click 'Load Audio & Start' first!"); return; }
+            if (!audioBuffer) return;
             
             const text = document.getElementById('notationInput').value.toUpperCase();
-            const regex = /\b(S'|S|R1|R2|R3|R|G1|G2|G3|G|M1|M2|M|P|D1|D2|D3|D|N1|N2|N3|N)\b/g;
+            // Match any Swara, including Mandra (e.g. S.) and Tara (e.g. S')
+            const regex = /\b(S'|R1'|R2'|G2'|G3'|M1'|M2'|P'|D1'|D2'|N2'|N3'|S\.|R1\.|R2\.|G2\.|G3\.|M1\.|M2\.|P\.|D1\.|D2\.|N2\.|N3\.|S|R1|R2|R3|R|G1|G2|G3|G|M1|M2|M|P|D1|D2|D3|D|N1|N2|N3|N)\b/g;
             const rawNotes = text.match(regex); 
             
             if (!rawNotes) { alert("No valid swaras found."); return; }
@@ -374,43 +432,39 @@ S' N D P M G R S</textarea>
             playButton.disabled = true;
             playButton.innerText = "Playing...";
 
-            for (let note of rawNotes) {
-                let resolvedSwara = note;
-
-                // Auto-resolve generic notes based on selected Raga
-                if (note === 'R') resolvedSwara = activeScale[1];
-                if (note === 'G') resolvedSwara = activeScale[2];
-                if (note === 'M') resolvedSwara = activeScale[3];
-                if (note === 'D') resolvedSwara = activeScale[5];
-                if (note === 'N') resolvedSwara = activeScale[6];
-
-                let targetKey = Object.keys(keyMap).find(k => keyMap[k] === resolvedSwara);
-                
-                startNote(resolvedSwara, targetKey);
-                
-                // Play for 400ms, pause for 100ms
-                await new Promise(r => setTimeout(r, 400));
-                stopNote(resolvedSwara, targetKey);
-                await new Promise(r => setTimeout(r, 100));
+            // Map generic notes (R, G, M) to the currently selected raga scale
+            const ragaName = document.getElementById('ragaSearch').value;
+            let arohanaSwaras = [];
+            if (ragas[ragaName]) {
+                arohanaSwaras = ragas[ragaName].aro.replace(/S'/g, '').trim().split(' ');
             }
 
+            for (let note of rawNotes) {
+                let octaveOffset = 0;
+                let baseNote = note;
+
+                if (note.includes("'")) { octaveOffset = 12; baseNote = note.replace("'", ""); }
+                if (note.includes(".")) { octaveOffset = -12; baseNote = note.replace(".", ""); }
+
+                // Resolve generic notations to exact scale notes
+                if (baseNote === 'R' && arohanaSwaras[1]) baseNote = arohanaSwaras[1];
+                if (baseNote === 'G' && arohanaSwaras[2]) baseNote = arohanaSwaras[2];
+                if (baseNote === 'M' && arohanaSwaras[3]) baseNote = arohanaSwaras[3];
+                if (baseNote === 'D' && arohanaSwaras[5]) baseNote = arohanaSwaras[5];
+                if (baseNote === 'N' && arohanaSwaras[6]) baseNote = arohanaSwaras[6];
+
+                let semitone = swaraToSemitone[baseNote] + octaveOffset;
+                
+                if (!isNaN(semitone)) {
+                    startNote(semitone);
+                    await new Promise(r => setTimeout(r, 400));
+                    stopNote(semitone);
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            }
             playButton.disabled = false;
             playButton.innerText = "Play Notation";
         }
-
-        // Physical Keyboard Support
-        window.addEventListener('keydown', (e) => {
-            if (e.repeat || document.activeElement.tagName === "TEXTAREA") return;
-            const key = e.key.toLowerCase();
-            if (keyMap[key]) startNote(keyMap[key], key);
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (document.activeElement.tagName === "TEXTAREA") return;
-            const key = e.key.toLowerCase();
-            if (keyMap[key]) stopNote(keyMap[key], key);
-        });
-
     </script>
 </body>
 </html>
