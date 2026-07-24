@@ -15,7 +15,8 @@
             text-align: center;
         }
         h2 { color: #d35400; margin-bottom: 5px; }
-        .status-bar { font-size: 0.9em; font-weight: bold; color: #e67e22; margin-bottom: 20px; }
+        .status-bar { font-size: 0.9em; font-weight: bold; margin-bottom: 5px; }
+        .midi-status { font-size: 0.85em; font-weight: bold; color: #7f8c8d; margin-bottom: 20px; }
         .panel {
             background: white;
             padding: 15px;
@@ -47,10 +48,10 @@
         button:hover { background-color: #e67e22; }
         button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
         .note { font-size: 0.9em; color: #7f8c8d; margin-bottom: 5px; }
+        .upload-subtext { font-size: 0.85em; color: #3498db; margin-top: 5px; display: block; }
         
         .toggle-btn { background-color: #2980b9; width: 100%; font-weight: bold; }
 
-        /* Few Keys (Raga Specific Layout) */
         .keys-few {
             display: flex;
             justify-content: center;
@@ -73,7 +74,6 @@
         }
         .key-few:active, .key-few.active { background-color: #e67e22; color: white; }
 
-        /* 3-Octave Full Keyboard Layout */
         .keys-full-wrapper {
             display: none; 
             width: 100%;
@@ -87,7 +87,7 @@
             display: flex;
             position: relative;
             height: 180px;
-            width: 1050px; /* Wide enough for 3 octaves (21 white keys * 50px) */
+            width: 1050px; 
         }
         .key-white {
             width: 50px;
@@ -137,30 +137,39 @@
 <body>
 
     <h2>Ultimate Carnatic Harmonium</h2>
-    <div class="status-bar" id="audioStatus">Loading harmonium-kannan-orig.wav in background...</div>
+    <div class="status-bar" id="audioStatus" style="color: #e67e22;">Loading harmonium-kannan-orig.wav in background...</div>
+    <div class="midi-status" id="midiStatus">&#127929; MIDI: Looking for devices...</div>
 
     <div class="panel">
-        <label><b>1. Select Raga:</b></label>
-        <p class="note">Search for a Melakarta or Janya raga. Arohana & Avarohana will populate automatically.</p>
-        <input type="text" id="ragaSearch" list="ragaList" placeholder="Type to search ragas (e.g., Kalyani, Mohanam)..." onchange="selectRaga()">
-        <datalist id="ragaList"></datalist>
-        
-        <button class="toggle-btn" onclick="toggleKeyboard()">Toggle: Raga Swaras (7 keys) / 3-Octave Harmonium</button>
+        <label><b>1. Select mElakartha rAgA:</b></label>
+        <p class="note">Type to search or click the dropdown arrow to select from the 72 mElakarthas.</p>
+        <input type="text" id="melaInput" list="melaList" placeholder="Search mElakartha..." onchange="onMelaSelect()">
+        <datalist id="melaList"></datalist>
 
-        <!-- 7-Key Raga Layout -->
+        <label style="margin-top:15px; display:block;"><b>2. Select janya rAgA (Optional):</b></label>
+        <p class="note">Filters automatically based on your chosen mElakartha.</p>
+        <input type="text" id="janyaInput" list="janyaList" placeholder="Search janya rAgA..." onchange="onJanyaSelect()">
+        <datalist id="janyaList"></datalist>
+        
+        <span class="upload-subtext"><i>Want more? Save the text from the <a href="http://www.carnatic.com/carnatic/ragalist.htm" target="_blank">Kumaran Santhanam list</a> as a .txt file and upload it here to import all 900+ Janyas.</i></span>
+        <input type="file" id="ragaListUpload" accept=".txt,.htm,.html">
+    </div>
+
+    <div class="panel">
+        <button class="toggle-btn" onclick="toggleKeyboard()">Toggle: Raga Swaras / 3-Octave Harmonium</button>
+
+        <!-- Dynamic Few-Key Layout -->
         <div class="keys-few" id="fewKeysContainer"></div>
 
         <!-- 3-Octave Piano Layout -->
         <div class="keys-full-wrapper" id="fullKeysContainer">
-            <div class="keys-full" id="pianoScrollArea">
-                <!-- Javascript will inject 3 octaves here -->
-            </div>
+            <div class="keys-full" id="pianoScrollArea"></div>
         </div>
     </div>
     
     <div class="panel">
-        <label><b>2. Auto-Play Notation File:</b></label>
-        <p class="note">Upload a .txt file or modify the text below. Plays based on the selected Raga.</p>
+        <label><b>3. Auto-Play Notation File:</b></label>
+        <p class="note">Upload a .txt file or paste your swaras below. Plays based on the active scale.</p>
         <input type="file" id="notationUpload" accept=".txt">
         <textarea id="notationInput">S R G M P D N S'
 S' N D P M G R S</textarea>
@@ -173,65 +182,340 @@ S' N D P M G R S</textarea>
         let audioBuffer = null;
         let activeNodes = {};
 
-        // Base 12 Semitones mapping for absolute calculation
         const swaraToSemitone = {
             'S': 0, 'R1': 1, 'R2': 2, 'R3': 3, 'G1': 2, 'G2': 3, 'G3': 4,
             'M1': 5, 'M2': 6, 'P': 7, 'D1': 8, 'D2': 9, 'D3': 10,
             'N1': 9, 'N2': 10, 'N3': 11
         };
 
-        let ragas = {}; // Will hold all generated and manual ragas
-        let activeScale = [];
+        let melakartaRagas = {}; 
+        let activeScaleNotes = []; 
+        let activeRagaAro = []; 
+        let activeLaptopKeyMap = {};
+        const laptopKeysRow = ['e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']'];
 
-        // 1. GENERATE 72 MELAKARTAS
-        const melakartaNames = [
-            "Kanakangi", "Ratnangi", "Ganamurti", "Vanaspati", "Manavati", "Tanarupi", "Senavati", "Hanumatodi", "Dhenuka", "Natakapriya", "Kokilapriya", "Rupavati",
-            "Gayakapriya", "Vakulabharanam", "Mayamalavagowla", "Chakravakam", "Suryakantam", "Hatakambari", "Jhankaradhvani", "Natabhairavi", "Keeravani", "Kharaharapriya", "Gourimanohari", "Varunapriya",
-            "Mararanjani", "Charukesi", "Sarasangi", "Harikambhoji", "Dheerasankarabharanam", "Naganandini", "Yagapriya", "Ragavardhini", "Gangeyabhushani", "Vagadheeswari", "Shulini", "Chalanata",
-            "Salagam", "Jalarnavam", "Jhalavarali", "Navaneetam", "Pavani", "Raghupriya", "Gavambodhi", "Bhavapriya", "Shubhapantuvarali", "Shadvidamargini", "Suvarnangi", "Divyamani",
-            "Dhavalambari", "Namanarayani", "Kamavardhani", "Ramapriya", "Gamanashrama", "Vishwambari", "Shamalangi", "Shanmukhapriya", "Simhendramadhyamam", "Hemavati", "Dharmavati", "Neetimati",
-            "Kantamani", "Rishabhapriya", "Latangi", "Vachaspati", "Mechakalyani", "Chitrambari", "Sucharitra", "Jyoti Swarupini", "Dhatuvardhani", "Nasikabhushani", "Kosalam", "Rasikapriya"
-        ];
-        
-        const purvanga = [['R1','G1'], ['R1','G2'], ['R1','G3'], ['R2','G2'], ['R2','G3'], ['R3','G3']];
-        const uttaranga = [['D1','N1'], ['D1','N2'], ['D1','N3'], ['D2','N2'], ['D2','N3'], ['D3','N3']];
+        // --- HARDCODED DATA FROM USER LIST ---
+        const melaRaw = `1 | kanakAn'gi                 | S R1 G1 M1 P D1 N1 S | S N1 D1 P M1 G1 R1 S
+2 | rathnAn'gi                 | S R1 G1 M1 P D1 N2 S | S N2 D1 P M1 G1 R1 S
+3 | gAnamUrthi                 | S R1 G1 M1 P D1 N3 S | S N3 D1 P M1 G1 R1 S
+4 | vanaspathi                 | S R1 G1 M1 P D2 N2 S | S N2 D2 P M1 G1 R1 S
+5 | mAnavathi                  | S R1 G1 M1 P D2 N3 S | S N3 D2 P M1 G1 R1 S
+6 | thAnarUpi                  | S R1 G1 M1 P D3 N3 S | S N3 D3 P M1 G1 R1 S
+7 | sEnAvathi                  | S R1 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R1 S
+8 | HanumathOdi                | S R1 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R1 S
+9 | DhEnukA                    | S R1 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R1 S
+10 | nAtakapriya                | S R1 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R1 S
+11 | kOkilapriya                | S R1 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R1 S
+12 | rUpavathi                  | S R1 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R1 S
+13 | gAyakapriya                | S R1 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R1 S
+14 | vakulAbharaNam             | S R1 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R1 S
+15 | mAyAmALava gowLA           | S R1 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R1 S
+16 | chakravAkam                | S R1 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R1 S
+17 | sUryakAntam                | S R1 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R1 S
+18 | HAtakAmbari                | S R1 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R1 S
+19 | Jan'kAradhvani             | S R2 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R2 S
+20 | naTabhairavi               | S R2 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R2 S
+21 | kIravANi                   | S R2 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R2 S
+22 | KaraHarapriya              | S R2 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R2 S
+23 | gowrimanOHari              | S R2 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R2 S
+24 | varuNapriya                | S R2 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R2 S
+25 | mAraranjani                | S R2 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R2 S
+26 | chArukeshi                 | S R2 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R2 S
+27 | sarasAn'gi                 | S R2 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R2 S
+28 | HarikAmbhOji               | S R2 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R2 S
+29 | DhIrashan'karAbharaNam     | S R2 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R2 S
+30 | nAgAnandhini               | S R2 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R2 S
+31 | yAgapriya                  | S R3 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R3 S
+32 | rAgavarDhani               | S R3 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R3 S
+33 | gAn'geyabhushani           | S R3 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R3 S
+34 | vAgaDhIsvari               | S R3 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R3 S
+35 | shUlini                    | S R3 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R3 S
+36 | chalanAta                  | S R3 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R3 S
+37 | sAlagam                    | S R1 G1 M2 P D1 N1 S | S N1 D1 P M2 G1 R1 S
+38 | jalArnavam                 | S R1 G1 M2 P D1 N2 S | S N2 D1 P M2 G1 R1 S
+39 | JAlavarALi                 | S R1 G1 M2 P D1 N3 S | S N3 D1 P M2 G1 R1 S
+40 | navanItham                 | S R1 G1 M2 P D2 N2 S | S N2 D2 P M2 G1 R1 S
+41 | pAvani                     | S R1 G1 M2 P D2 N3 S | S N3 D2 P M2 G1 R1 S
+42 | raGupriya                  | S R1 G1 M2 P D3 N3 S | S N3 D3 P M2 G1 R1 S
+43 | gavAmbodhi                 | S R1 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R1 S
+44 | bhavapriya                 | S R1 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R1 S
+45 | shubhapanthuvarALi         | S R1 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R1 S
+46 | shadhvidha mArgiNi         | S R1 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R1 S
+47 | suvarNAn'gi                | S R1 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R1 S
+48 | dhivyAmaNi                 | S R1 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R1 S
+49 | dhavalAmbari               | S R1 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R1 S
+50 | nAmanArAyaNi               | S R1 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R1 S
+51 | kAmavardhini               | S R1 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R1 S
+52 | rAmapriya                  | S R1 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R1 S
+53 | gamanashrama               | S R1 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R1 S
+54 | vishvAmbhari               | S R1 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R1 S
+55 | shyAmaLAngi                | S R2 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R2 S
+56 | shanmuKapriya              | S R2 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R2 S
+57 | simHendra madhyamam        | S R2 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R2 S
+58 | HemAvathi                  | S R2 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R2 S
+59 | DharmAvathi                | S R2 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R2 S
+60 | nIthimathi                 | S R2 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R2 S
+61 | kAnthAmaNi                 | S R2 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R2 S
+62 | rishabhapriya              | S R2 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R2 S
+63 | lathAngi                   | S R2 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R2 S
+64 | vAchaspathi                | S R2 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R2 S
+65 | mEchakalyANi               | S R2 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R2 S
+66 | chithrAmbari               | S R2 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R2 S
+67 | sucharithra                | S R3 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R3 S
+68 | jyothisvarUpiNi            | S R3 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R3 S
+69 | dhAtuvardhani              | S R3 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R3 S
+70 | nAsika bhUshaNi            | S R3 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R3 S
+71 | kosalam                    | S R3 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R3 S
+72 | rasikapriya                | S R3 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R3 S`;
 
-        melakartaNames.forEach((name, index) => {
-            let M = index < 36 ? 'M1' : 'M2';
-            let p = Math.floor((index % 36) / 6);
-            let u = (index % 36) % 6;
-            let aro = `S ${purvanga[p][0]} ${purvanga[p][1]} ${M} P ${uttaranga[u][0]} ${uttaranga[u][1]} S'`;
-            let ava = `S' ${uttaranga[u][1]} ${uttaranga[u][0]} P ${M} ${purvanga[p][1]} ${purvanga[p][0]} S`;
-            ragas[name] = { aro, ava };
-        });
+        const janyaRaw = `AHiri                | 8| S R1 S G3 M1 P D1 N2 S  | S N2 D1 P M1 G3 R1 S
+asAvEri              | 8| S R1 M1 P D1 S          | SN2SPD1M1PR1G2R1S
+bhUpALam             | 8| S R1 G2 P D1 S          | S D1 P G2 R1 S
+dhanyAsi             | 8| S G2 M1 P N2 S          | S N2 D1 P M1 G2 R1 S
+punnAgavarALi        | 8| N2 , S R1 G2 M1 P D1 N2 | N2 D1 P M1 G2 R1 S N2 ,
+sindhu bhairavi      |10| S R2 G2 M1 G2 P D1 N2 S | N2 D1 P M1 G2 R1 S N2 S
+kalagada             |13| S R1 G3 P D1 N1 S       | S N1 D1 P G3 R1 S
+vasanthabhairavi     |14| S R1 G3 M1 D1 N2 S      | S N2 D1 M1 P M1 G3 R1 S
+ardhradhesi          |15| S R1 G3 M1 P D1 S N3 S  | S D1 P M1 G3 R1 S
+bowLi                |15| S R1 G3 P D1 S          | S N3 D1 P G3 R1 S
+gowLa                |15| S R1 M1 P N3 S          | S N3 P M1 R1 G3 M1 R1 S
+gowLipanthu          |15| S R1 M1 P N3 S          | SN3D1PM1D1M1G3R1S
+gowri                |15| S R1 M1 P N3 S          | S N3 D1 P M1 G3 R1 S
+gujjari              |15| S R1 G3 M1 P D1 N3 S    | S D1 N3 P M1 G3 R1 S
+gumma kAmbhoji       |15| S R1 G3 P D1 N3 D1 S    | S N3 D1 P M1 G3 R1 S
+gundhakriya          |15| S R1 M1 P N3 S          | S N3 P D1 P M1 G3 R1 S
+jaganmOhini          |15| S G3 M1 P N3 S          | S N3 P M1 G3 R1 S
+kannadaban'gALa      |15| S R1 M1 G3 M1 P D1 S    | S D1 P M1 G3 R1 S
+kRushNaveNi          |15| S R1 G3 M1 P N3 S       | S N3 P M1 G3 R1 S
+lalithA              |15| S R1 G3 M1 D2 N3 S      | S N3 D2 M1 G3 R1 S
+malaHari             |15| S R1 M1 P D1 S          | S D1 P M1 G3 R1 S
+mallikA vasantham    |15| S G3 M1 P N3 S          | S N3 D1 P M1 G3 R1 S
+mangaLakaishiki      |15| S M1 G3 M1 P M1 D1 N3 S | S N3 D1 P M1 G3 R1 S
+mEchabowLi           |15| S R1 G3 P D1 S          | S D1 P M1 G3 R1 S
+mEGaranjani          |15| S R1 G3 M1 N3 S         | S N3 M1 G3 R1 S
+nAdhanAmakriya       |15| S R1 G3 M1 P D1 N3      | N3 D1 P M1 G3 R1 S N3
+pAdi                 |15| S R1 M1 P N3 S          | S N3 P D1 P M1 R1 S
+pharaz               |15| S G3 M1 P D1 N3 S       | S N3 D1 P M1 G3 R1 S
+pUrvi                |15| S R1 G3 M1 P D1 N3 D1 S | SN3D1PM1D1M1G3R1S
+rEvagupthi           |15| S R1 G3 P D1 S          | S D1 P G3 R1 S
+sAran'ganAtha        |15| S R1 M1 P D1 S          | S N3 S D1 P M1 G3 R1 S
+sAvEri               |15| S R1 M1 P D1 S          | S N3 D1 P M1 G3 R1 S
+sindhu rAmakriya     |15| S G3 M1 P D1 N3 S       | S N3 P D1 P M1 G3 S
+thakka  (a)          |15| S R1 S M1 G3 M1 D1 N3 S | S N3 P M1 G 3 M1 P R1 G3 S
+thakka  (b)          |15| S G3 M1 P M1 D1 N3 S    | S N3 D1 P M1 G3 R1 S
+bindhumAlini         |16| S G3 R1 G3 M1 P N2 S    | S N2 S D2 P G3 R1 S
+kalAvathi            |16| S R1 M1 P D2 S          | S D2 P M1 G3 S R1 S
+malayamArutham       |16| S R1 G3 P D2 N2 S       | S N2 D2 P G3 R1 S
+valachi              |16| S G3 P D2 N2 S          | S N2 D2 P G3 S
+vegavAHini           |16| S R1 G3 M1 P D2 N2 D2 S | S N2 D2 P M1 G3 R1 S
+bhairavam            |17| S R1 G3 M1 P D2 N3 S    | S D2 P M1 G3 R1 S
+sowrAshtram          |17| S R1 G3 M1 P M1 D2 N3 S | S N3 D2 N2 D2 P M1 G3 R1 S
+supradhIpam          |17| S R1 M1 P D2 S          | S N3 D2 P M1 G3 M1 R1 S
+vasanthA             |17| S M1 G3 M1 D2 N3 S      | S N3 D2 M1 G3 R1 S
+pUrnalalitha         |19| S G2 R2 M1 P S          | S N1 D1 P M1 G2 R2 S
+amrithavAHini        |20| S R2 M1 P D1 N2 S       | S N2 D1 M1 G2 R2 S
+Anandhabhairavi      |20| SG2R2G2M1PD2PN2S        | S N2 D2 P M1 G2 R2 S
+bhairavi             |20| S R2 G2 M1 P D2 N2 S    | S N2 D1 P M1 G2 R2 S
+Gantha               |20| SG2R2G2M1PD2PN2D2N2S    | S N2 D2 P M1 G2 R2 S
+gopikavasantham      |20| S M1 P N2 D1 N2 D1 S    | S N2 D1 P M1 G2 S
+HindhoLam            |20| S G2 M1 D1 N2 S         | S N2 D1 M1 G2 S
+jayanthashrI         |20| S G2 M1 D1 N2 S         | S N2 D1 M1 P M1 G2 S
+jingla               |20| SR2G2M1PD1N2D1PS        | S N2 D1 P M1 G2 R2 S
+mAnji                |20| S R2 G2 M1 P D2 N2 S    | S N2 D1 P M1 G2 R2 S
+mArgaHindhoLam       |20| S R2 G2 M1 P D2 N2 S    | S N2 D2 M1 G2 S
+pUrNashajja          |20| S R2 G2 M1 N2 N2 S      | S N2 P M1 G2 R2 S
+sAramathi            |20| S R2 G2 M1 P D1 N2 S    | S N2 D1 M1 G2 S
+sudhdha dhanyAsi     |20| S G2 M1 P N2 S          | S N2 P M1 G2 S
+sudhdha dhesi        |20| S R2 M1 P D1 N2 S       | S N2 D1 P M1 G2 R2 S
+kiraNAvaLi           |21| S R2 G2 M1 P D1 N3 S    | S P M1 G2 R2 S
+kalyANa vasantham    |21| S G2 M1 D1 N3 S         | S N3 D1 P M1 G2 R2 S
+AbhEri               |22| S G2 M1 P N2 S          | S N2 D2 P M1 G2 R2 S
+abhOgi               |22| S R2 G2 M1 D2 S         | S D2 M1 G2 R2 S
+AndhOLika            |22| S R2 M1 P N2 S          | S N2 D2 M1 R2 S
+bAgEshrI             |22| S G2 M1 D2 N2 S         | S N2 D2 M1 P D2 G2 M1 R2 S
+brindhAvanasAran'ga  |22| S R2 M1 P N3 S          | S N2 P M1 R2 G2 S
+chiththaranjani      |22| S R2 G2 M1 P D2 N2      | N2 D2 P M1 G2 R2 S N2.
+dharbAru             |22| S R2 M1 P D2 N2 S       | R2SN2SD2PM1R2G2G2R2S
+dhEvAmRuthavarshiNi  |22| S R2 G2 M1 N2 D2 N2 S   | S N2 D2 P M1 G2 R2 S
+dhEvakriya           |22| S R2 M1 P N2 S          | S N2 D2 N2 P M1 G2 R2 S
+dhEvamanOHari        |22| S R2 M1 P D2 N2 S       | S N2 D2 N2 P M1 R2 S
+dhilipakam           |22| SR2G2R2M1PN2D2N2PD2N2S  | S N2 D2 P M1 G2 R2 S
+HindhoLavasantha     |22| S G2 M1 P D2 N2 D2 S    | S N2 D2 P M1 D2 M1 G2 S
+HindhusthAni kApi    |22| S R2 M1 P N3 S          | S N2 D2 N2 P M1 G2 R2 S
+HusEni               |22| S R2 G2 M1 P N2 D2 N2 S | S N2 D1 P M1 G2 R2 S
+jayamanOHari         |22| S R2 G2 M1 D2 S         | S N2 D2 M1 G2 R2 S
+jayanArAyaNi         |22| S R2 G2 M1 P D2 S       | S N2 D2 P M1 G2 R2 S
+jayanthasEna         |22| S G2 M1 P D2 S          | S N2 D2 P M1 P M1 G2 S
+kAnadA               |22| S R2 G2 M1 D N2 S       | S N2 P M1 G2 M1 R2 S
+kalAniDhi            |22| SR2G2M1SPM1D2N2S        | S N2 D2 P M1 G2 R2 S
+kannadagowLa         |22| S R2 G2 M1 P N2 S       | S N2 D2 P M1 G2 S
+kApijingla           |22| S N2 S R2 G2 M1         | M1 G2 R2 S N2 D2 N2 S
+karnAtaka kApi       |22| SR2G2M1R2PM1PD2N2S      | S N2 D2 P M1 G2 M1 R2 S
+mAlavashrI           |22| SG2M1PN2D2N2PD2N2S      | S N2 D2 P M1 G2 S
+madhyamAvathi        |22| S R2 M1 P N2 S          | S N2 P M1 R2 S
+maNirangu            |22| S R2 M1 P N2 S          | S N2 P M1 G2 R2 S
+manjari              |22| SG2R2G2M1PN2D2N2S       | S N2 D2 P M1 G2 R2 S
+manOHari             |22| S G2 R2 G2 M1 P D2 S    | S D2 P M1 G2 R2 S
+muKAri               |22| S R2 M1 P N2 D2 S       | S N2 D1 P M1 G2 R2 S
+nAdhachinthAmaNi *   |22| S G2 M1 P N2 D2 N2 S    | S N2 D2 P M1 G2 R2 G2 S
+nAdhatharan'gini     |22| S P M1 R2 G2 R2 S       | S P N2 D2 P M1 G2 R2 S
+nAyaki               |22| S R2 M1 P D2 N2 D2 P S  | S N2 D2 P M1 R2 G2 R2 S
+phalamanjari         |22| S G2 M1 D2 S            | S N2 D2 P M1 G2 M1 R2 S
+panchama rAga        |22| S R2 D2 P N2 S          | S N2 D2 P M1 G2 R2 S
+pUrnashadjam         |22| S R2 G2 M1 N2 S         | S N2 P M1 G2 R2 S
+pushpalathika        |22| S R2 G2 M1 P N2 S       | S N2 P M1 G2 R2 S
+rIthigowLa           |22| SG2R2G2M1N2D2M1N2N2S    | SN2D2M1G2M1PM1G2R2S
+rudhrapriya          |22| S R2 G2 M1 P D2 N2 S    | S N2 P M1 G2 R2 S
+sAlakabhairavi       |22| S R2 M1 P D2 S          | S N2 D2 P M1 G2 R2 S
+saindhavi            |22| N2D2N2SR2G2M1PD2N2      | D2PM1G2R2SN2D2N2S
+sidhdhasEna          |22| S G2 R2 G2 M1 P D2 S    | SN2D2M1PM1R2G2R2S
+shrIrAga             |22| S R2 M1 P N2 S          | SN2PD2N2PM1R2G2R2S
+shrIranjani          |22| S R2 G2 M1 D2 N2 S      | S N2 D2 M1 G2 R2 S
+sudhdha ban'gALa     |22| S R2 M1 P D2 S          | S D2 P M1 R2 G2 R2 S
+sudhdha dhanyAsi     |22| S G2 M1 P N2 S          | S N2 P M1 G2 S
+svarabhUshani        |22| S G2 M1 P D2 N2 S       | S N2 D2 P M1 R2 S
+vasantha varALi 1    |24| S R2 M1 P D3 N3         | N3 D3 P G2 R2 S N3
+vasantha varALi 2    |24| S R2 M1 P D3 N3         | N3 D3 P M G1 R S N
+vIravasantham        |24| S G2 R2 M1 P S          | S N3 D3 P M1 G2 R2 S
+kamalAmanOHari       |27| S G3 M1 P N3 S          | S N3 D1 P M1 G3 S
+naLinakAnthi         |27| S G3 R2 M1 P N3 S       | S N3 P M1 G3 R2 S
+baHudhAri            |28| S G3 M1 P D2 N2 S       | S N2 P M1 G3 S
+balaHamsa            |28| S R2 M1 P D2 S          | S N2 D2 P M1 R2 M1 G3 S
+ChAyAtharan'giNi     |28| S R2 M1 G3 M1 P N2 S    | S N2 D2 P M1 G3 R2 S
+dhvijAvanthi         |28| S R2 M1 G3 M1 P D2 S    | S N2 D2 P M1 G3 R2 G2 R2 S
+HaridhAsapriya *     |28| S P M1 G3 M1 P D2 N2 S  | S N2 D2 N2 P M1 G3 R2 S
+IshamanOHari         |28| S R2 G3 M1 P D2 N2 S    | SN2D2PM1R2M1G3R2S
+janjUti              |28| S R2 G3 M1 P D2 N2      | N2D2PM1G3R2SN2.D2.P.D2.S
+jujAHuli             |28| S M1 G3 M1 P D2 N2 S    | S N2 D2 P M1 G3 S
+kAmbhOji             |28| S R2 G3 M1 P D2 S       | SN2D2PM1G3R2SN3.P.D2.S
+kApinArAyaNi         |28| S R2 M1 P D2 N2 S       | S N2 D2 P M1 G3 R2 S
+kamAs                |28| S M1 G3 M1 P D2 N2 S    | S N2 D2 P M1 G3 R2 S
+karnAtaka bEHAg      |28| S R2 G3 M1 P D2 N2 S    | SN2D2N2PD2M1G3R2G3R2
+kedhAragowLa         |28| S R2 M1 P N2 S          | S N2 D2 P M1 G3 R2 S
+kOkilaDhvani         |28| S R2 G3 M1 D2 N2 D2 S   | S N2 D2 N2 P M1 G3 R2 S
+kunthalavarALi       |28| S M1 P D2 N2 D2 S       | S N2 D2 P M1 S
+mAlavi               |28| SR2G3M1PN2M1D2N2S       | SN2D2N2PM1G3M1R2S
+mOHana               |28| S R2 G3 P D2 S          | S D2 P G3 R2 S
+nAgasvarAvaLi        |28| S G3 M1 P D2 S          | S D2 P M1 G3 S
+nArAyaNagowLa        |28| S R2 M1 P N2 D2 N2 S    | S N2 P M1 G3 R2 G3 R2 S
+nArAyani             |28| S R2 M1 P D2 S          | S N2 D2 P M1 R2 S
+nAtakuraN~ji         |28| SR2G3M1N2D2N2PD2N2S     | S N2 D2 M1 G3 M1 P G3 R2 S
+navarasa kalAnidhi * |28| S R2 M1 P S N2 S        | S D2 P M1 G3 R2 S
+navarasa kannada     |28| S G3 M1 P S             | S N2 D2 M1 G3 R2 S
+prathApa  varALi     |28| S R2 M1 P D2 P S        | S D2 P M1 G3 R2 S
+pravAlajothi         |28| S R2 M1 P D2 N2 S       | S N2 D2 N2 P M1 G3 G3
+rAgapanjaram         |28| S R2 M1 P D2 N2 D2 S    | S N2 D2 M1 R2 S
+ravichandhrika       |28| S R2 G3 M1 D2 N2 D2 S   | S N2 D2 M1 G3 R2 S
+sAma                 |28| S R2 M1 P D2 S          | S D2 P M1 G3 R2 S
+saHAna               |28| S R2 G3 M1 P M1 D2 N2 S | SN2SD2N2D2PM1G3M1R2G3R2S
+sarasvathi manOHari  |28| S R2 G3 M1 D2 S         | S D2 N2 P M1 G3 R2 S
+sindhu kannada       |28| SM1G3M1R2G3M1PD2PS      | S N2 D2 P M1 G3 R2 S
+sudhdha tharan'gini  |28| SR2G3M1R2M1PD2N2D2S     | S N2 D2 P M1 G3 R2 S
+supOshini            |28| S R2 S M1 P N2 D2 S     | S D2 N2 P M1 R2 M1 S
+surati               |28| S R2 M1 P N2 S          | SN2D2PM1G3PM1R2S
+svarAvaLi            |28| S M1 G3 M1 P N2 D2 N2 S | S N2 P D2 M1 G3 R2 S
+svaravEdhi *         |28| S M1 G3 M1 P N2 D2 N2 S | S N2 D2 N2 P M1 G3
+thilan'g             |28| S G3 M1 P N3 S          | S N2 P M1 G3 S
+umAbharaNam          |28| S R2 G3 M1 P D2 N2 S    | S N2 P M1 R2 G3 M1 R2 S
+vINA vAdhini         |28| S R2 G3 P N2 S          | S N2 P G3 R2 S
+vivardhini           |28| S R2 M1 P S             | S N2 D2 P M1 G3 R2 S
+yadhukulakAmbhOji    |28| S R2 M1 P D2 S          | S N2 D2 P M1 G3 R2 S
+Arabhi               |29| S R2 M1 P D2 S          | S N3 D2 P M1 G3 R2 S
+atAna                |29| S R2 M1 P N3 S          | S N3 D2 P M1 P G3 R2 S
+ban'gALa             |29| S R2 G3 M1 P M1 R2 P S  | S N3 P M1 R2 G3 R2 S
+begada               |29| SG3R2G3M1PD2N2D2PS      | S N3 D2 P M1 G3 R2 S
+bEHAg                |29| S G3 M1 P N3 D2 N3 S    | S N3 D2 P M1 G3 R2 S
+bilaHari             |29| S R2 G3 P D2 S          | S N3 D2 P M1 G3 R2 S
+dhesAkshi            |29| S R2 G3 P D2 S          | S N3 D2 P M1 G3 R2 S
+dhEvagAndhAri        |29| S R2 M1 P D2 S          | S N3 D2 P M1 G3 R2 S
+garudaDhvani         |29| S R2 G3 M1 P D2 N3 S    | S D2 P G3 R2 S
+HamsaDhvani          |29| S R2 G3 P N3 S          | S N3 P G3 R2 S
+HindhusthAni bEHAg   |29| S G3 M1 P N3 D2 N3 S    | SN3D2PM2G3M1G3R2S
+janaranjani          |29| S R2 G3 M1 P D2 P N3 S  | S D2 P M1 R2 S
+kadhana kuthUHalam   |29| S R2 M1 D2 N3 G3 P S    | S N3 D2 P M1 G3 R2 S
+kannada              |29| S G3 M1 P M1 D2 N3 S    | S D2 P M1 G3 M1 R2 N3. S
+kEdhAram             |29| S M1 G3 M1 P N3 S       | S N3 P M1 G3 R2 S
+koiAHalam            |29| S P M1 G3 M1 P D2 N3 S  | S N3 D2 P M1 G3 R2 S
+kuraN~ji             |29| S N3 S R2 G3 M1 P D2    | D2 P M1 G3 R2 S N3 S
+kuthUHalam           |29| S R2 M1 N3 D2 P N3 S    | S N3 D2 P M1 G3 R2 S
+mAnd                 |29| S G3 M1 P D2 S          | S N3 D2 P M1 G3 R2 S
+navaroj              |29| P D2 N3 S R2 G3 M1 P    | M1 G3 R2 S N3 D2 P
+nIlAmbari            |29| S R2 G3 M1 P D2 P N3 S  | S N3 P M1 G3 R2 G3 S
+pUrNachandhrika      |29| S R2 G3 M1 P D2 P S     | S N3 P M1 R2 G3 M1 R2 S
+sindhu mandhAri      |29| S R2 G3 M1 P D2 P S     | SN3D2PG3M1D2PM1R2S
+sudhdha sAvEri       |29| S R2 M1 P D2 S          | S D2 P M1 R2 S
+ChAyAnAta            |34| S R3 G3 M1 P M1 P S     | S N2 D2 N2 P M1 R3 S
+gAnavAridhi          |34| S M1 R3 G3 M1 P D2 N2 S | S D2 N2 P M1 R3 S
+gambhiranAta         |36| S G3 M1 P N3 S          | S N3 P M1 G3 S
+nAta                 |36| S R3 G3 M1 P D3 N3 S    | S N3 P M1 R3 S
+JinAvaLi             |39| SG1R1G1M2PD1N3D1S       | S N3 D1 P M2 G1 R1 S
+varALi               |39| S G1 R1 G1 M2 P D1 N3 S | S N3 D1 P M2 G1 R1 S
+nabhOmaNi            |40| S R1 G1 R1 M2 P S       | S N2 D2 P M2 G1 R1 S
+chandhrajyothi       |41| S R1 G1 M2 P D2 S       | S D2 P M2 G1 R1 S
+vijayashrI           |41| S G1 R1 G1 M2 P N3 S    | S N3 P M2 G1 R1 S
+thivravAHini         |46| S R1 G2 M2 P D2 N2 S    | SN2D2PM2G2R1G2M2R1S
+dhipaka              |51| S G3 M2 P D1 P S        | S N3 D1 N3 P M2 G3 R1 S
+mandhAri             |51| S R1 G3 M2 P N3 S       | S N3 P M2 G3 R1 S
+rAma manOHari        |52| S R1 G3 M2 P D2 N2 D2 S | S N2 D2 P M2 G3 R1 S
+gamakakriya          |53| S R1 G3 M2 P D2 P S     | S N3 D2 P M2 G3 R1 S
+gamanakriya          |53| S R1 M2 P D2 N3 S       | S N3 D2 P M2 G3 M2 R1 S
+HamsAnandhi          |53| S R1 G3 M2 D2 N3 S      | S N3 D2 M2 G3 R1 S
+mEchakAn'gi          |53| S R1 G3 M2 P D2 N3 S    | S N3 P D2 P M2 G3 R1 S
+pUrvikalyANi         |53| S R1 G3 M2 P D2 P S     | S N3 D2 P M2 G3 R1 S
+vijayavasantha       |54| S M2 P D3 N3 S          | S N3 P M2 G3 R1 S
+chinthAmaNi          |56| S R2 P M2 P D2 N2 S     | S P D1 P M2 G2 R2 S
+sudhdha rAga         |57| S R2 G2 M2 P N3 S       | S N3 P M2 G2 R2 S
+vijayanAgari         |58| S R2 G2 M2 P D2 S       | S D2 P M2 G2 R2 S
+madhuvanthi          |59| S G2 M2 P N3 S          | S N3 D2 P M2 G2 R2 S
+ranjani              |59| S R2 G2 M2 D2 S         | S N3 D2 M2 G2 S R2 G2 S
+amarasenapriya       |60| S R2 M2 P N3 S          | S N3 P M2 R2 G2 R2 S
+HamsanAdham          |60| S R2 M2 P N3 S          | S N3 P M2 R2 S
+kaikavAsi            |60| S R2 G2 M2 P D3 N3 S    | S N3 P M2 G2 R2 S
+shruthiranjani       |61| S R2 G3 M2 P D1 N1      | N1 D1 P M2 G3 S R2 S
+gopriya              |62| S R2 G3 M2 D1 N2 S      | S N2 D1 M2 G3 R2 S
+bhUshavaLi           |64| S R2 G3 M2 P D2 S       | S N2 D2 P M2 G3 R2 S
+sarasvathi           |64| S R2 M2 P D2 S          | S N2 D2 P M2 R2 S
+HamirkalyANi         |65| S P M2 P D2 N3 S        | SN3D2PM2M1G3PM1R2S
+mOHanakalyANi        |65| S R2 G3 P D2 S          | S N3 D2 P M2 G3 R2 S
+sAran'ga             |65| S R2 G3 M2 P D2 N3 S    | SN3D2PM2R2G3M1R2S
+yamunAkalyANi        |65| S R2 G3 P M2 P D2 S     | S D2 P M2 P G3 R2 S
+amRuthavarshiNi      |66| S G3 M2 P N3 S          | S N3 P M2 G3 S`;
 
-        // 2. ADD POPULAR JANYA RAGAS (Manodharma / Concert Favorites)
-        const janyaRagas = {
-            "Mohanam": { aro: "S R2 G3 P D2 S'", ava: "S' D2 P G3 R2 S" },
-            "Hamsadhvani": { aro: "S R2 G3 P N3 S'", ava: "S' N3 P G3 R2 S" },
-            "Hindolam": { aro: "S G2 M1 D1 N2 S'", ava: "S' N2 D1 M1 G2 S" },
-            "Kambhoji": { aro: "S R2 G3 M1 P D2 S'", ava: "S' N2 D2 P M1 G3 R2 S" },
-            "Vasantha": { aro: "S G3 M1 D2 N3 S'", ava: "S' N3 D2 M1 G3 R1 S" },
-            "Madhyamavati": { aro: "S R2 M1 P N2 S'", ava: "S' N2 P M1 R2 S" },
-            "Abhogi": { aro: "S R2 G2 M1 D2 S'", ava: "S' D2 M1 G2 R2 S" },
-            "Bhairavi": { aro: "S R2 G2 M1 P D2 N2 S'", ava: "S' N2 D1 P M1 G2 R2 S" },
-            "Anandabhairavi": { aro: "S G2 R2 G2 M1 P D2 P S'", ava: "S' N2 D2 P M1 G2 R2 S" },
-            "Sriranjani": { aro: "S R2 G2 M1 D2 N2 S'", ava: "S' N2 D2 M1 G2 R2 S" }
-        };
-        Object.assign(ragas, janyaRagas);
+        // 1. PARSE DATA
+        function initializeData() {
+            melaRaw.trim().split('\n').forEach(line => {
+                let parts = line.split('|').map(s => s.trim());
+                if(parts.length === 4) {
+                    let [num, name, aro, ava] = parts;
+                    melakartaRagas[num] = { name, aro, ava, janyas: [] };
+                }
+            });
 
-        // Populate Datalist
-        const dataList = document.getElementById('ragaList');
-        Object.keys(ragas).sort().forEach(name => {
-            let option = document.createElement('option');
-            option.value = name;
-            dataList.appendChild(option);
-        });
+            janyaRaw.trim().split('\n').forEach(line => {
+                let parts = line.split('|').map(s => s.trim());
+                if(parts.length === 4) {
+                    let [name, melaNum, aro, ava] = parts;
+                    if (melakartaRagas[melaNum]) {
+                        melakartaRagas[melaNum].janyas.push({ name, aro, ava });
+                    }
+                }
+            });
 
-        // 3. BACKGROUND AUDIO LOADING
+            const melaList = document.getElementById('melaList');
+            Object.keys(melakartaRagas).forEach(num => {
+                let opt = document.createElement('option');
+                opt.value = `${num} - ${melakartaRagas[num].name}`;
+                melaList.appendChild(opt);
+            });
+        }
+
+        // 2. UI INITIALIZATION & MIDI
         window.addEventListener('DOMContentLoaded', async () => {
+            initializeData();
             audioCtx = new AudioContext();
             build3OctaveKeyboard();
+            setupMIDI(); // Initialize MIDI on load
+
             try {
                 const response = await fetch('harmonium-kannan-orig.wav');
                 if (!response.ok) throw new Error("File not found");
@@ -241,20 +525,123 @@ S' N D P M G R S</textarea>
                 document.getElementById('audioStatus').innerHTML = "Audio Loaded & Ready! &#9989;";
                 document.getElementById('audioStatus').style.color = "#27ae60";
                 
-                // Set default Raga
-                document.getElementById('ragaSearch').value = "Mayamalavagowla";
-                selectRaga();
-                
+                document.getElementById('melaInput').value = "15 - mAyAmALava gowLA";
+                onMelaSelect();
             } catch (err) {
-                document.getElementById('audioStatus').innerText = "Error: harmonium-kannan-orig.wav not found in directory.";
+                document.getElementById('audioStatus').innerText = "Error: harmonium-kannan-orig.wav not found.";
                 document.getElementById('audioStatus').style.color = "#c0392b";
             }
         });
 
-        // Browsers require interaction to resume AudioContext
         document.body.addEventListener('click', () => { 
             if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
         });
+
+        // 3. MIDI INTEGRATION
+        function setupMIDI() {
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+            } else {
+                document.getElementById('midiStatus').innerHTML = "&#10060; WebMIDI is not supported in this browser.";
+            }
+        }
+
+        function onMIDISuccess(midiAccess) {
+            let inputs = midiAccess.inputs.values();
+            let connected = false;
+            for (var input of inputs) {
+                input.onmidimessage = getMIDIMessage;
+                connected = true;
+            }
+            if (connected) {
+                document.getElementById('midiStatus').innerHTML = "&#127929; MIDI Connected! (Ready to play)";
+                document.getElementById('midiStatus').style.color = "#27ae60";
+            } else {
+                document.getElementById('midiStatus').innerHTML = "&#9888; No MIDI devices detected. Plug in OP-1 and refresh.";
+            }
+            
+            // Listen for device connect/disconnect
+            midiAccess.onstatechange = function(e) {
+                if (e.port.type === "input") {
+                    if (e.port.state === "connected") {
+                        e.port.onmidimessage = getMIDIMessage;
+                        document.getElementById('midiStatus').innerHTML = "&#127929; MIDI Connected! (Ready to play)";
+                        document.getElementById('midiStatus').style.color = "#27ae60";
+                    } else {
+                        document.getElementById('midiStatus').innerHTML = "&#9888; MIDI Disconnected.";
+                        document.getElementById('midiStatus').style.color = "#c0392b";
+                    }
+                }
+            };
+        }
+
+        function onMIDIFailure() {
+            document.getElementById('midiStatus').innerHTML = "&#10060; Could not access MIDI devices.";
+        }
+
+        function getMIDIMessage(message) {
+            const command = message.data[0];
+            const note = message.data[1];
+            const velocity = (message.data.length > 2) ? message.data[2] : 0;
+
+            // Map MIDI Note 60 (Middle C) to Semitone 0 (Madhya Sthayi Sa)
+            const semitone = note - 60; 
+
+            if (command === 144 && velocity > 0) { // Note On
+                startNote(semitone);
+                document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.add('active'));
+            } else if (command === 128 || (command === 144 && velocity === 0)) { // Note Off
+                stopNote(semitone);
+                document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.remove('active'));
+            }
+        }
+
+        // 4. DROPDOWN SEARCH LOGIC
+        function onMelaSelect() {
+            const melaInputVal = document.getElementById('melaInput').value;
+            const melaNum = melaInputVal.split(' - ')[0]; 
+            
+            if (melakartaRagas[melaNum]) {
+                const raga = melakartaRagas[melaNum];
+                const janyaList = document.getElementById('janyaList');
+                janyaList.innerHTML = '';
+                document.getElementById('janyaInput').value = ''; 
+                
+                raga.janyas.sort((a,b) => a.name.localeCompare(b.name)).forEach(j => {
+                    let opt = document.createElement('option');
+                    opt.value = j.name;
+                    janyaList.appendChild(opt);
+                });
+
+                updateRagaUI(raga.aro, raga.ava);
+            }
+        }
+
+        function onJanyaSelect() {
+            const melaInputVal = document.getElementById('melaInput').value;
+            const melaNum = melaInputVal.split(' - ')[0]; 
+            const janyaInputVal = document.getElementById('janyaInput').value;
+
+            if (melakartaRagas[melaNum]) {
+                const janya = melakartaRagas[melaNum].janyas.find(j => j.name === janyaInputVal);
+                if (janya) {
+                    updateRagaUI(janya.aro, janya.ava);
+                }
+            }
+        }
+
+        function updateRagaUI(aroStr, avaStr) {
+            document.getElementById('notationInput').value = `${aroStr}\n${avaStr}`;
+            
+            const extractRegex = /(S|R[1-3]|G[1-3]|M[1-2]|P|D[1-3]|N[1-3])/g;
+            const allNotesMatch = `${aroStr} ${avaStr}`.match(extractRegex) || [];
+            activeScaleNotes = Array.from(new Set(allNotesMatch)); 
+            activeScaleNotes.sort((a, b) => swaraToSemitone[a] - swaraToSemitone[b]);
+            activeRagaAro = aroStr.match(extractRegex) || activeScaleNotes;
+
+            buildFewKeys();
+            updateLaptopKeyMap();
+        }
 
         function toggleKeyboard() {
             const full = document.getElementById('fullKeysContainer');
@@ -265,44 +652,33 @@ S' N D P M G R S</textarea>
             } else {
                 full.style.display = 'block';
                 few.style.display = 'none';
-                // Auto scroll to middle octave
                 full.scrollLeft = 250;
             }
         }
 
-        function selectRaga() {
-            const ragaName = document.getElementById('ragaSearch').value;
-            if (ragas[ragaName]) {
-                const aro = ragas[ragaName].aro;
-                const ava = ragas[ragaName].ava;
-                document.getElementById('notationInput').value = `${aro}\n${ava}`;
-                
-                // Extract just the unique swaras from Arohana to build the 7-key layout
-                activeScale = aro.replace(/S'/g, '').trim().split(' ');
-                activeScale.push("S'"); // Ensure high Sa is at the end
-                
-                buildFewKeys();
-            }
+        function updateLaptopKeyMap() {
+            activeLaptopKeyMap = {};
+            activeScaleNotes.forEach((swara, index) => {
+                let triggerKey = laptopKeysRow[index];
+                if (triggerKey) {
+                    activeLaptopKeyMap[triggerKey] = swaraToSemitone[swara];
+                }
+            });
+            activeLaptopKeyMap[laptopKeysRow[activeScaleNotes.length]] = 12;
         }
 
-        // Build the Raga-Specific 7-8 keys
         function buildFewKeys() {
             const container = document.getElementById('fewKeysContainer');
             container.innerHTML = '';
             
-            // Map physical row to whatever the scale length is (QWERTY row)
-            const fallbackKeys = ['e','r','t','y','u','i','o','p','[',']'];
-
-            activeScale.forEach((swara, index) => {
+            activeScaleNotes.forEach((swara, index) => {
                 let btn = document.createElement('div');
                 btn.className = 'key-few';
-                let triggerKey = fallbackKeys[index] || '';
-                
+                let triggerKey = laptopKeysRow[index] || '';
                 btn.innerHTML = `${swara}<br>(${triggerKey})`;
                 
-                let baseSwara = swara.replace("'", "");
-                let octaveOffset = swara.includes("'") ? 12 : 0;
-                let semitone = swaraToSemitone[baseSwara] + octaveOffset;
+                let semitone = swaraToSemitone[swara];
+                btn.setAttribute('data-semitone', semitone);
 
                 btn.onmousedown = () => startNote(semitone, btn);
                 btn.onmouseup = () => stopNote(semitone, btn);
@@ -312,9 +688,21 @@ S' N D P M G R S</textarea>
                 
                 container.appendChild(btn);
             });
+
+            let highSaBtn = document.createElement('div');
+            highSaBtn.className = 'key-few';
+            let highTrigger = laptopKeysRow[activeScaleNotes.length] || '';
+            highSaBtn.innerHTML = `S'<br>(${highTrigger})`;
+            highSaBtn.setAttribute('data-semitone', 12);
+            
+            highSaBtn.onmousedown = () => startNote(12, highSaBtn);
+            highSaBtn.onmouseup = () => stopNote(12, highSaBtn);
+            highSaBtn.onmouseleave = () => stopNote(12, highSaBtn);
+            highSaBtn.ontouchstart = (e) => { e.preventDefault(); startNote(12, highSaBtn); };
+            highSaBtn.ontouchend = () => stopNote(12, highSaBtn);
+            container.appendChild(highSaBtn);
         }
 
-        // Build the 3-Octave Harmonium Layout (Mandra, Madhya, Tara)
         function build3OctaveKeyboard() {
             const container = document.getElementById('pianoScrollArea');
             const octaves = [
@@ -324,53 +712,47 @@ S' N D P M G R S</textarea>
             ];
             const pattern = [
                 { type: 'white', swara: 'S', offset: 0 },
-                { type: 'black', swara: 'r1', offset: 1, left: '35px' },
+                { type: 'black', swara: 'R1', offset: 1, left: '35px' },
                 { type: 'white', swara: 'R2', offset: 2 },
-                { type: 'black', swara: 'g2', offset: 3, left: '85px' },
+                { type: 'black', swara: 'G2', offset: 3, left: '85px' },
                 { type: 'white', swara: 'G3', offset: 4 },
                 { type: 'white', swara: 'M1', offset: 5 },
-                { type: 'black', swara: 'm2', offset: 6, left: '185px' },
+                { type: 'black', swara: 'M2', offset: 6, left: '185px' },
                 { type: 'white', swara: 'P', offset: 7 },
-                { type: 'black', swara: 'd1', offset: 8, left: '285px' },
+                { type: 'black', swara: 'D1', offset: 8, left: '285px' },
                 { type: 'white', swara: 'D2', offset: 9 },
-                { type: 'black', swara: 'n2', offset: 10, left: '335px' },
+                { type: 'black', swara: 'N2', offset: 10, left: '335px' },
                 { type: 'white', swara: 'N3', offset: 11 }
             ];
 
             let absoluteLeft = 0;
-
             octaves.forEach((oct, octIndex) => {
-                let whiteKeyCount = 0;
                 pattern.forEach((keyDef) => {
                     let btn = document.createElement('div');
                     let semitone = keyDef.offset + oct.offset;
-                    
                     if (keyDef.type === 'white') {
                         btn.className = 'key-white';
                         btn.innerHTML = `<div class="key-label">${keyDef.swara}<br>${octIndex === 1 ? '' : oct.label[0]}</div>`;
-                        container.appendChild(btn);
                         absoluteLeft += 50;
-                        whiteKeyCount++;
                     } else {
                         btn.className = 'key-black';
                         btn.innerHTML = keyDef.swara;
-                        // Calculate black key position relative to total width so far
                         btn.style.left = `${absoluteLeft - 15}px`;
-                        container.appendChild(btn);
                     }
-
+                    btn.setAttribute('data-semitone', semitone);
                     btn.onmousedown = () => startNote(semitone, btn);
                     btn.onmouseup = () => stopNote(semitone, btn);
                     btn.onmouseleave = () => stopNote(semitone, btn);
                     btn.ontouchstart = (e) => { e.preventDefault(); startNote(semitone, btn); };
                     btn.ontouchend = () => stopNote(semitone, btn);
+                    container.appendChild(btn);
                 });
             });
             
-            // Add final High Sa for the 3rd octave
             let finalBtn = document.createElement('div');
             finalBtn.className = 'key-white';
             finalBtn.innerHTML = `<div class="key-label">S</div>`;
+            finalBtn.setAttribute('data-semitone', 24);
             finalBtn.onmousedown = () => startNote(24, finalBtn);
             finalBtn.onmouseup = () => stopNote(24, finalBtn);
             finalBtn.onmouseleave = () => stopNote(24, finalBtn);
@@ -379,23 +761,34 @@ S' N D P M G R S</textarea>
             container.appendChild(finalBtn);
         }
 
-        // CORE AUDIO PLAYBACK
-        function startNote(semitone, uiElement = null) {
-            if (!audioBuffer) return;
-            if (activeNodes[semitone]) return;
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat || document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") return;
+            const semitone = activeLaptopKeyMap[e.key.toLowerCase()];
+            if (semitone !== undefined) {
+                document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.add('active'));
+                startNote(semitone);
+            }
+        });
 
+        window.addEventListener('keyup', (e) => {
+            if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") return;
+            const semitone = activeLaptopKeyMap[e.key.toLowerCase()];
+            if (semitone !== undefined) {
+                document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.remove('active'));
+                stopNote(semitone);
+            }
+        });
+
+        function startNote(semitone, uiElement = null) {
+            if (!audioBuffer || activeNodes[semitone]) return;
             const source = audioCtx.createBufferSource();
             const gainNode = audioCtx.createGain();
-            
             source.buffer = audioBuffer;
-            source.playbackRate.value = Math.pow(2, semitone / 12); // Pitch shift math
-            
+            source.playbackRate.value = Math.pow(2, semitone / 12); 
             source.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-            
             source.start(0);
             activeNodes[semitone] = { source, gainNode };
-
             if (uiElement) uiElement.classList.add('active');
         }
 
@@ -409,7 +802,6 @@ S' N D P M G R S</textarea>
             if (uiElement) uiElement.classList.remove('active');
         }
 
-        // AUTO-PLAY NOTATION PARSER
         document.getElementById('notationUpload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -418,12 +810,41 @@ S' N D P M G R S</textarea>
             reader.readAsText(file);
         });
 
+        // Parse custom imports
+        document.getElementById('ragaListUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const lines = evt.target.result.split('\n');
+                let count = 0;
+                lines.forEach(line => {
+                    let parts = line.split('|').map(s => s.trim());
+                    if (parts.length >= 4) {
+                        let melaNum = parseInt(parts[1]);
+                        if (!isNaN(melaNum) && melaNum >= 1 && melaNum <= 72) {
+                            if (melakartaRagas[melaNum]) {
+                                let aro = parts[2];
+                                let ava = parts[3];
+                                if (!melakartaRagas[melaNum].janyas.some(j => j.name.toLowerCase() === parts[0].toLowerCase())) {
+                                    melakartaRagas[melaNum].janyas.push({name: parts[0], aro, ava});
+                                    count++;
+                                }
+                            }
+                        }
+                    }
+                });
+                alert(`Success! Imported ${count} Janya ragas into the database.`);
+                onMelaSelect(); 
+            };
+            reader.readAsText(file);
+        });
+
         async function playNotation() {
             if (!audioBuffer) return;
             
             const text = document.getElementById('notationInput').value.toUpperCase();
-            // Match any Swara, including Mandra (e.g. S.) and Tara (e.g. S')
-            const regex = /\b(S'|R1'|R2'|G2'|G3'|M1'|M2'|P'|D1'|D2'|N2'|N3'|S\.|R1\.|R2\.|G2\.|G3\.|M1\.|M2\.|P\.|D1\.|D2\.|N2\.|N3\.|S|R1|R2|R3|R|G1|G2|G3|G|M1|M2|M|P|D1|D2|D3|D|N1|N2|N3|N)\b/g;
+            const regex = /(S'|R[1-3]'?|G[1-3]'?|M[1-2]'?|P'?|D[1-3]'?|N[1-3]'?|S\.|R[1-3]\.|G[1-3]\.|M[1-2]\.|P\.|D[1-3]\.|N[1-3]\.|S|R|G|M|P|D|N)/g;
             const rawNotes = text.match(regex); 
             
             if (!rawNotes) { alert("No valid swaras found."); return; }
@@ -432,13 +853,6 @@ S' N D P M G R S</textarea>
             playButton.disabled = true;
             playButton.innerText = "Playing...";
 
-            // Map generic notes (R, G, M) to the currently selected raga scale
-            const ragaName = document.getElementById('ragaSearch').value;
-            let arohanaSwaras = [];
-            if (ragas[ragaName]) {
-                arohanaSwaras = ragas[ragaName].aro.replace(/S'/g, '').trim().split(' ');
-            }
-
             for (let note of rawNotes) {
                 let octaveOffset = 0;
                 let baseNote = note;
@@ -446,19 +860,20 @@ S' N D P M G R S</textarea>
                 if (note.includes("'")) { octaveOffset = 12; baseNote = note.replace("'", ""); }
                 if (note.includes(".")) { octaveOffset = -12; baseNote = note.replace(".", ""); }
 
-                // Resolve generic notations to exact scale notes
-                if (baseNote === 'R' && arohanaSwaras[1]) baseNote = arohanaSwaras[1];
-                if (baseNote === 'G' && arohanaSwaras[2]) baseNote = arohanaSwaras[2];
-                if (baseNote === 'M' && arohanaSwaras[3]) baseNote = arohanaSwaras[3];
-                if (baseNote === 'D' && arohanaSwaras[5]) baseNote = arohanaSwaras[5];
-                if (baseNote === 'N' && arohanaSwaras[6]) baseNote = arohanaSwaras[6];
+                if (baseNote === 'R') baseNote = activeRagaAro.find(s => s.includes('R')) || 'R1';
+                if (baseNote === 'G') baseNote = activeRagaAro.find(s => s.includes('G')) || 'G1';
+                if (baseNote === 'M') baseNote = activeRagaAro.find(s => s.includes('M')) || 'M1';
+                if (baseNote === 'D') baseNote = activeRagaAro.find(s => s.includes('D')) || 'D1';
+                if (baseNote === 'N') baseNote = activeRagaAro.find(s => s.includes('N')) || 'N1';
 
                 let semitone = swaraToSemitone[baseNote] + octaveOffset;
                 
                 if (!isNaN(semitone)) {
+                    document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.add('active'));
                     startNote(semitone);
                     await new Promise(r => setTimeout(r, 400));
                     stopNote(semitone);
+                    document.querySelectorAll(`[data-semitone="${semitone}"]`).forEach(el => el.classList.remove('active'));
                     await new Promise(r => setTimeout(r, 100));
                 }
             }
