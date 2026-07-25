@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carnatic Raga Visualizer (12/22 Note Toggle)</title>
+    <title>Carnatic Raga & 22 Shruti Visualizer</title>
+    <!-- Include Chart.js with fallback support -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -29,6 +30,7 @@
             overflow: hidden;
         }
 
+        /* Layout */
         .left-panel {
             flex: 0 0 420px;
             background: var(--panel-bg);
@@ -352,6 +354,7 @@
             return parseInt(n) / parseInt(d);
         }
         function fixHighSa(swaraStr, isArohana) {
+            if (!swaraStr) return "";
             let swaras = swaraStr.trim().split(/\s+/);
             if (isArohana && swaras[swaras.length - 1] === 'S') swaras[swaras.length - 1] = "S'";
             if (!isArohana && swaras[0] === 'S') swaras[0] = "S'";
@@ -729,10 +732,8 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             return results;
         }
 
-        async function init() {
-            renderGrid();
-            initChart();
-            
+        // --- SAFE INITIALIZATION WRAPPER ---
+        function parseDatabase() {
             melaData.trim().split('\n').forEach(line => {
                 let parts = line.split('|').map(s => s.trim());
                 if(parts.length === 4) {
@@ -752,23 +753,58 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     }
                 }
             });
+        }
 
-            renderSidebar();
+        async function init() {
+            // STEP 1: Parse and render DB immediately so sidebar is NEVER blank
+            try {
+                parseDatabase();
+                renderSidebar();
+            } catch (err) {
+                console.error("Error parsing raga database:", err);
+            }
 
+            // STEP 2: Render initial grid
+            try {
+                renderGrid();
+            } catch (err) {
+                console.error("Error rendering grid:", err);
+            }
+
+            // STEP 3: Event Listeners
             document.getElementById('btn-compare').addEventListener('click', toggleCompareMode);
             document.getElementById('btn-reset').addEventListener('click', resetSelection);
             document.getElementById('btn-toggle-view').addEventListener('click', toggleViewMode);
-            
-            audioCtx = new AudioContext();
+
+            // STEP 4: Safe Chart Initialization (Check if Chart.js is loaded)
             try {
+                if (typeof Chart !== 'undefined') {
+                    initChart();
+                } else {
+                    console.warn("Chart.js not detected. Graph disabled.");
+                }
+            } catch (err) {
+                console.error("Error initializing chart:", err);
+            }
+            
+            // STEP 5: Safe Audio Initialization
+            try {
+                audioCtx = new AudioContext();
                 const response = await fetch('harmonium-kannan-orig.wav');
-                if (!response.ok) throw new Error("File not found");
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
                 audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 document.getElementById('audioStatus').innerText = "Audio Ready \u2713";
+                document.getElementById('audioStatus').style.color = "#27ae60";
             } catch (err) {
-                document.getElementById('audioStatus').innerText = "Audio Not Available";
-                document.getElementById('audioStatus').style.color = "#c0392b";
+                console.warn("Audio load warning:", err);
+                const statusEl = document.getElementById('audioStatus');
+                if (window.location.protocol === 'file:') {
+                    statusEl.innerText = "Audio Warning: Use local web server for WAV file";
+                } else {
+                    statusEl.innerText = "Audio File Missing";
+                }
+                statusEl.style.color = "#e67e22";
             }
         }
 
@@ -880,6 +916,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
 
         function renderSidebar() {
             const container = document.getElementById('raga-list');
+            container.innerHTML = '';
             
             Object.keys(ragasDB).forEach(key => {
                 const mela = ragasDB[key];
@@ -1163,9 +1200,11 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 });
             });
 
-            ragaChart.data.labels = chartLabels;
-            ragaChart.data.datasets = chartDatasets;
-            ragaChart.update();
+            if (ragaChart) {
+                ragaChart.data.labels = chartLabels;
+                ragaChart.data.datasets = chartDatasets;
+                ragaChart.update();
+            }
         }
 
         function toggleCompareMode() {
