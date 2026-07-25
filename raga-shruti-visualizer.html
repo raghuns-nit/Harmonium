@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carnatic Raga & 22 Shruti Visualizer</title>
-    <!-- Include Chart.js with fallback support -->
+    <title>Carnatic Raga Visualizer (12/22 Note Toggle)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -30,7 +29,6 @@
             overflow: hidden;
         }
 
-        /* Layout */
         .left-panel {
             flex: 0 0 420px;
             background: var(--panel-bg);
@@ -666,6 +664,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             }).join('');
         }
 
+        // --- FIXED: Pure Sequential Mapping to avoid backwards-drawing graphs ---
         function extractTraceData(rawStr, parentMelaId = null) {
             let parentAro = '';
             if (parentMelaId) {
@@ -675,16 +674,12 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
 
             const regex = /(S'|R[1-3]'?|G[1-3]'?|M[1-2]'?|P'?|D[1-3]'?|N[1-3]'?|S\.|R[1-3]\.|G[1-3]\.|M[1-2]\.|P\.|D[1-3]\.|N[1-3]\.|S|R|G|M|P|D|N)/g;
             const lines = rawStr.trim().split('\n');
-            const isScale = lines.length <= 2; 
 
             let results = [];
-            let step = 1;
-
-            lines.forEach((line, lineIndex) => {
-                const phase = lineIndex === 0 ? 'Aro' : 'Ava';
+            
+            lines.forEach((line) => {
                 const matches = line.match(regex) || [];
-                
-                matches.forEach(note => {
+                matches.forEach((note) => {
                     let base = note.replace(/['.]/g, ''); 
                     let octaveOffset = note.includes("'") ? 1 : note.includes(".") ? -1 : 0;
 
@@ -711,21 +706,13 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     let multiplier = ratioToMultiplier(ratio) * Math.pow(2, octaveOffset);
                     let hz = BASE_FREQ * multiplier;
 
-                    let baseFamily = base.replace(/[1-3]/g, ''); 
-                    let slotName = isScale ? `${phase}-${baseFamily}` : `Step ${step}`;
-                    if (isScale && baseFamily === 'S' && octaveOffset > 0) slotName = `${phase}-S'`;
-                    else if (isScale && baseFamily === 'S' && octaveOffset < 0) slotName = `${phase}-S.`;
-                    else if (isScale && baseFamily === 'S' && lineIndex === 1 && octaveOffset === 0) slotName = `Ava-S`;
-
                     results.push({ 
                         note: note, 
                         cents: Math.round(cents), 
                         ratio: ratio, 
                         hz: parseFloat(hz.toFixed(2)), 
-                        multiplier: multiplier,
-                        slot: slotName
+                        multiplier: multiplier
                     });
-                    step++;
                 });
             });
 
@@ -756,7 +743,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
         }
 
         async function init() {
-            // STEP 1: Parse and render DB immediately so sidebar is NEVER blank
             try {
                 parseDatabase();
                 renderSidebar();
@@ -764,19 +750,16 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 console.error("Error parsing raga database:", err);
             }
 
-            // STEP 2: Render initial grid
             try {
                 renderGrid();
             } catch (err) {
                 console.error("Error rendering grid:", err);
             }
 
-            // STEP 3: Event Listeners
             document.getElementById('btn-compare').addEventListener('click', toggleCompareMode);
             document.getElementById('btn-reset').addEventListener('click', resetSelection);
             document.getElementById('btn-toggle-view').addEventListener('click', toggleViewMode);
 
-            // STEP 4: Safe Chart Initialization (Check if Chart.js is loaded)
             try {
                 if (typeof Chart !== 'undefined') {
                     initChart();
@@ -787,7 +770,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 console.error("Error initializing chart:", err);
             }
             
-            // STEP 5: Safe Audio Initialization
             try {
                 audioCtx = new AudioContext();
                 const response = await fetch('harmonium-kannan-orig.wav');
@@ -1103,18 +1085,15 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             let chartDatasets = [];
             let chartLabels = [];
 
-            const isAllScales = selectedRagas.every(r => r.rawSequenceStr.trim().split('\n').length <= 2);
-            
-            if (isAllScales) {
-                chartLabels = [
-                    'Aro-S', 'Aro-R', 'Aro-G', 'Aro-M', 'Aro-P', 'Aro-D', 'Aro-N', "Aro-S'",
-                    "Ava-S'", 'Ava-N', 'Ava-D', 'Ava-P', 'Ava-M', 'Ava-G', 'Ava-R', 'Ava-S'
-                ];
+            let maxSteps = 0;
+            if(selectedRagas.length > 0) {
+                maxSteps = Math.max(...selectedRagas.map(r => extractTraceData(r.rawSequenceStr, r.groupId).length));
+            }
+
+            if (selectedRagas.length === 1) {
+                const trace = extractTraceData(selectedRagas[0].rawSequenceStr, selectedRagas[0].groupId);
+                chartLabels = trace.map((d, i) => `${i + 1}: ${d.note}`);
             } else {
-                let maxSteps = 0;
-                if(selectedRagas.length > 0) {
-                    maxSteps = Math.max(...selectedRagas.map(r => extractTraceData(r.rawSequenceStr, r.groupId).length));
-                }
                 chartLabels = Array.from({length: maxSteps}, (_, i) => `Step ${i + 1}`);
             }
 
@@ -1177,8 +1156,8 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 }
 
                 const traceData = extractTraceData(raga.rawSequenceStr, raga.groupId);
-                const dataPoints = traceData.map(d => ({ 
-                    x: isAllScales ? d.slot : d.slot,
+                const dataPoints = traceData.map((d, i) => ({ 
+                    x: chartLabels[i], 
                     y: d.hz, 
                     note: d.note, 
                     ratio: d.ratio, 
