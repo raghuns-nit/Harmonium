@@ -487,21 +487,35 @@ sAran'ga             |65| S R2 G3 M2 P D2 N3 S    | SN3D2PM2R2G3M1R2S
 yamunAkalyANi        |65| S R2 G3 P M2 P D2 S     | S D2 P M2 P G3 R2 S
 amRuthavarshiNi      |66| S G3 M2 P N3 S          | S N3 P M2 G3 S`;
 
+        // Auto-correct the high Sa for imported text lists
+        function fixHighSa(swaraStr, isArohana) {
+            let swaras = swaraStr.trim().split(/\s+/);
+            if (isArohana && swaras[swaras.length - 1] === 'S') swaras[swaras.length - 1] = "S'";
+            if (!isArohana && swaras[0] === 'S') swaras[0] = "S'";
+            return swaras.join(' ');
+        }
+
         // 1. PARSE DATA
         function initializeData() {
+            // Parse Melakartas with S' correction
             melaRaw.trim().split('\n').forEach(line => {
                 let parts = line.split('|').map(s => s.trim());
                 if(parts.length === 4) {
-                    let [num, name, aro, ava] = parts;
-                    melakartaRagas[num] = { name, aro, ava, janyas: [] };
+                    let aro = fixHighSa(parts[2], true);
+                    let ava = fixHighSa(parts[3], false);
+                    melakartaRagas[parts[0]] = { name: parts[1], aro: aro, ava: ava, janyas: [] };
                 }
             });
 
+            // Parse Janyas with S' correction
             janyaRaw.trim().split('\n').forEach(line => {
                 let parts = line.split('|').map(s => s.trim());
                 if(parts.length === 4) {
-                    let [name, melaNum, aro, ava] = parts;
+                    let name = parts[0];
+                    let melaNum = parts[1];
                     if (melakartaRagas[melaNum]) {
+                        let aro = fixHighSa(parts[2], true);
+                        let ava = fixHighSa(parts[3], false);
                         melakartaRagas[melaNum].janyas.push({ name, aro, ava });
                     }
                 }
@@ -830,8 +844,8 @@ amRuthavarshiNi      |66| S G3 M2 P N3 S          | S N3 P M2 G3 S`;
                         let melaNum = parseInt(parts[1]);
                         if (!isNaN(melaNum) && melaNum >= 1 && melaNum <= 72) {
                             if (melakartaRagas[melaNum]) {
-                                let aro = parts[2];
-                                let ava = parts[3];
+                                let aro = fixHighSa(parts[2], true);
+                                let ava = fixHighSa(parts[3], false);
                                 if (!melakartaRagas[melaNum].janyas.some(j => j.name.toLowerCase() === parts[0].toLowerCase())) {
                                     melakartaRagas[melaNum].janyas.push({name: parts[0], aro, ava});
                                     count++;
