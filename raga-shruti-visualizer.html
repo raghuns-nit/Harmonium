@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carnatic Raga & 22 Shruti Visualizer</title>
+    <!-- Include Chart.js for the graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -29,7 +31,7 @@
 
         /* Layout */
         .left-panel {
-            flex: 0 0 450px;
+            flex: 0 0 420px;
             background: var(--panel-bg);
             border-radius: 10px;
             padding: 20px;
@@ -42,7 +44,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
             overflow-y: auto;
         }
 
@@ -57,9 +59,7 @@
             overflow: hidden;
             transition: box-shadow 0.2s;
         }
-        .mela-group.selected {
-            box-shadow: 0 0 0 2px var(--color-1);
-        }
+        .mela-group.selected { box-shadow: 0 0 0 2px var(--color-1); }
 
         .mela-header {
             background: #ecf0f1;
@@ -126,7 +126,7 @@
             gap: 10px;
             align-items: center;
             background: var(--panel-bg);
-            padding: 15px;
+            padding: 10px 15px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             border: 1px solid var(--border-color);
@@ -150,7 +150,7 @@
 
         .grid-container {
             background: var(--panel-bg);
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             border: 1px solid var(--border-color);
@@ -159,7 +159,7 @@
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             grid-template-rows: repeat(4, 1fr);
-            gap: 10px;
+            gap: 8px;
         }
         .tile {
             background: #fff;
@@ -172,13 +172,13 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            min-height: 80px;
+            min-height: 70px;
             transition: all 0.3s;
         }
         .tile-number { position: absolute; top: 4px; left: 6px; font-size: 0.75em; color: #7f8c8d; font-weight: bold; }
         .tile-ratio { position: absolute; top: 4px; right: 6px; font-size: 0.7em; color: #95a5a6; }
-        .tile-name { font-weight: bold; font-size: 0.9em; margin-top: 10px; }
-        .tile-carnatic { font-size: 0.7em; color: #e67e22; margin-top: 4px; }
+        .tile-name { font-weight: bold; font-size: 0.85em; margin-top: 10px; }
+        .tile-carnatic { font-size: 0.65em; color: #e67e22; margin-top: 4px; }
         
         .dots-container {
             display: flex;
@@ -190,21 +190,29 @@
         .dot { width: 12px; height: 12px; border-radius: 50%; display: none; }
         .dot.active { display: block; }
         
-        .info-panel {
+        .chart-container {
             background: var(--panel-bg);
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             border: 1px solid var(--border-color);
-            font-size: 0.9em;
-            line-height: 1.5;
+            position: relative;
+            height: 250px; /* Constrain height */
         }
-        .info-panel h4 { margin-top: 0; color: #d35400; }
-        .info-panel ul { padding-left: 20px; margin-bottom: 0; }
-        .info-panel li { margin-bottom: 10px; }
-        .cite { color: #7f8c8d; font-size: 0.85em; }
 
-        /* Highlighting selections in list */
+        .info-panel {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            font-size: 0.85em;
+            line-height: 1.4;
+        }
+        .info-panel h4 { margin-top: 0; margin-bottom: 8px; color: #d35400; }
+        .info-panel ul { padding-left: 20px; margin-bottom: 0; margin-top: 0;}
+        .info-panel li { margin-bottom: 6px; }
+
         .selected-list-item { background-color: #f1c40f1a !important; box-shadow: inset 3px 0 0 #f39c12; }
 
     </style>
@@ -229,20 +237,22 @@
 
         <!-- 22 Shruti Grid -->
         <div class="grid-container">
-            <h3>22 Shruti "Periodic Table" Map</h3>
-            <div class="periodic-table" id="shruti-grid">
-                <!-- Tiles injected by JS -->
-            </div>
+            <h3 style="margin-bottom: 10px;">22 Shruti "Periodic Table" Map</h3>
+            <div class="periodic-table" id="shruti-grid"></div>
+        </div>
+
+        <!-- Frequency Graph View -->
+        <div class="chart-container">
+            <canvas id="ragaChart"></canvas>
         </div>
 
         <!-- Research Info -->
         <div class="info-panel">
-            <h4>Research & Logic Behind 22 Shrutis</h4>
+            <h4>Logic Behind 22 Shrutis</h4>
             <ul>
-                <li><strong>What are Shrutis?</strong> While there are 12 universally identifiable notes in an octave, human perception of these 12 changes exactly at 22 points given by nature, known as the 22 Shrutis.</li>
-                <li><strong>The Mathematical Ratios:</strong> Each Shruti is defined by a precise natural mathematical ratio (e.g., 256/243 for Atikomal Rishabh). Based on Galileo's law of inverse proportionality, these ratios represent the exact physical location on a string where the note is perfectly in tune.</li>
-                <li><strong>Shruti-Nirman Chakra:</strong> The frequencies are not arbitrary. They arise logically in 5 groups of 4 shrutis each, appearing sequentially at set percentage distances (like 5.34%, 6.66%, 11.11%, and 12.5%).</li>
-                <li><strong>Cosmic Connection:</strong> A fascinating discovery shows that the atomic mass of elements in the chemical periodic table maps directly to the 22 Shrutis to a 99% accuracy, suggesting the universal code of matter and acoustic resonance are fundamentally linked.</li>
+                <li><strong>What are Shrutis?</strong> While there are 12 universally identifiable notes in an octave, human perception of these 12 changes exactly at 22 natural resonance points, known as the 22 Shrutis.</li>
+                <li><strong>The Mathematical Ratios & Frequencies:</strong> Each Shruti is defined by a precise natural mathematical ratio (e.g., 256/243 for Atikomal Rishabh). The chart above maps these exact ratios logarithmically into <strong>Cents</strong>, showing the exact pitch contour of the Raga sequence.</li>
+                <li><strong>Cosmic Connection:</strong> Research has shown that the atomic mass of elements in the chemical periodic table maps directly to these 22 Shruti frequencies to a 99% accuracy, suggesting the universal code of matter and acoustic resonance are fundamentally linked.</li>
             </ul>
         </div>
     </div>
@@ -250,22 +260,9 @@
     <script>
         // Mapping standard Carnatic notations to the 22 Shrutis
         const carnaticToShruti = {
-            'S': 1,
-            'R1': 3,  // Suddha Re
-            'R2': 5,  // Chatusruti Re
-            'R3': 7,  // Shatsruti Re
-            'G1': 5,  // Suddha Ga (Same pitch as R2)
-            'G2': 7,  // Sadharana Ga (Same pitch as R3)
-            'G3': 8,  // Antara Ga
-            'M1': 10, // Suddha Ma
-            'M2': 12, // Prati Ma
-            'P': 14,  // Panchama
-            'D1': 16, // Suddha Dha
-            'D2': 18, // Chatusruti Dha
-            'D3': 20, // Shatsruti Dha
-            'N1': 18, // Suddha Ni (Same pitch as D2)
-            'N2': 20, // Kaisiki Ni (Same pitch as D3)
-            'N3': 21  // Kakali Ni
+            'S': 1, 'R1': 3, 'R2': 5, 'R3': 7, 'G1': 5, 'G2': 7, 'G3': 8,
+            'M1': 10, 'M2': 12, 'P': 14, 'D1': 16, 'D2': 18, 'D3': 20,
+            'N1': 18, 'N2': 20, 'N3': 21
         };
 
         const shrutis = [
@@ -292,6 +289,12 @@
             { id: 21, name: "N1 (Shuddha)", ratio: "15/8", col: 7, row: 3, carnatic: "Kakali Ni (N3)" },
             { id: 22, name: "N2 (Tivra Shuddha)", ratio: "243/128", col: 7, row: 4, carnatic: "" }
         ];
+
+        // Convert natural ratio fractions to standard Cents for graphing
+        function ratioToCents(ratioStr) {
+            const [n, d] = ratioStr.split('/');
+            return 1200 * Math.log2(parseInt(n) / parseInt(d));
+        }
 
         // Raw Data
         const melaData = `1 | kanakAn'gi | S R1 G1 M1 P D1 N1 S | S N1 D1 P M1 G1 R1 S
@@ -583,20 +586,11 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
         let ragasDB = {};
         let isCompareMode = false;
         let selectedRagas = [];
+        let ragaChart = null;
+        
+        // Use exact hex values for Chart.js
+        const chartColors = ['#e74c3c', '#3498db', '#2ecc71'];
         const colors = ['var(--color-1)', 'var(--color-2)', 'var(--color-3)'];
-
-        // Helper: Parse Swara string into Shruti IDs for the Grid
-        function getShrutiIds(rawSequence) {
-            const regex = /(S|R1|R2|R3|G1|G2|G3|M1|M2|P|D1|D2|D3|N1|N2|N3)/g;
-            const matches = rawSequence.match(regex);
-            if (!matches) return [];
-            
-            const ids = new Set();
-            matches.forEach(swara => {
-                if (carnaticToShruti[swara]) ids.add(carnaticToShruti[swara]);
-            });
-            return Array.from(ids);
-        }
 
         // Helper: Format Sequence with colored HTML Pills
         function formatSequence(rawSequence) {
@@ -609,8 +603,46 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             }).join('');
         }
 
+        // Helper: Convert Sequence string to Chart Data points (Pitch Cents)
+        function extractTraceData(rawStr, parentMelaId = null) {
+            let parentAro = '';
+            if (parentMelaId) {
+                const melaId = parentMelaId.replace('group-', '');
+                if (ragasDB[melaId]) parentAro = ragasDB[melaId].aro;
+            }
+
+            const regex = /(S'|R[1-3]'?|G[1-3]'?|M[1-2]'?|P'?|D[1-3]'?|N[1-3]'?|S\.|R[1-3]\.|G[1-3]\.|M[1-2]\.|P\.|D[1-3]\.|N[1-3]\.|S|R|G|M|P|D|N)/g;
+            const matches = rawStr.match(regex) || [];
+
+            return matches.map(note => {
+                let base = note.replace(/['.]/g, ''); 
+                let octaveOffset = note.includes("'") ? 1 : note.includes(".") ? -1 : 0;
+
+                // Resolve generic notes to parent specifics if dealing with a Janya
+                if (['R','G','M','D','N'].includes(base)) {
+                    let parentNoteMatch = parentAro.match(new RegExp(base + '[1-3]', 'g'));
+                    if (parentNoteMatch) base = parentNoteMatch[0];
+                    else base += '1'; // Fallback
+                }
+
+                let shrutiId = carnaticToShruti[base];
+                let cents = 0;
+                
+                if (shrutiId) {
+                    const shruti = shrutis.find(s => s.id === shrutiId);
+                    if (shruti) cents = ratioToCents(shruti.ratio);
+                } else if (base === 'S') cents = 0;
+                else if (base === 'P') cents = ratioToCents("3/2");
+
+                cents += (octaveOffset * 1200);
+
+                return { note: note, cents: Math.round(cents) };
+            });
+        }
+
         function init() {
             renderGrid();
+            initChart();
             
             // Build Database
             melaData.trim().split('\n').forEach(line => {
@@ -669,18 +701,16 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 groupDiv.id = `group-${mela.num}`;
                 
                 const melaId = `mela-${mela.num}`;
-                const melaShrutiIds = getShrutiIds(`${mela.aro} ${mela.ava}`);
+                const melaRawSequence = `${mela.aro} ${mela.ava}`;
                 
                 const headerDiv = document.createElement('div');
                 headerDiv.className = 'mela-header';
                 headerDiv.id = melaId;
                 
                 headerDiv.onclick = function(e) {
-                    // Toggle Accordion visibility
                     const jContainer = this.nextElementSibling;
                     jContainer.style.display = jContainer.style.display === 'block' ? 'none' : 'block';
-                    // Trigger selection to map on grid
-                    handleRagaSelection(melaId, `${mela.num}. ${mela.name}`, melaShrutiIds, groupDiv.id);
+                    handleRagaSelection(melaId, `${mela.num}. ${mela.name}`, melaRawSequence, groupDiv.id);
                 };
 
                 headerDiv.innerHTML = `
@@ -695,15 +725,15 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 if (mela.janyas.length > 0) {
                     mela.janyas.forEach((janya, jIndex) => {
                         const janyaId = `janya-${mela.num}-${jIndex}`;
-                        const jShrutiIds = getShrutiIds(`${janya.aro} ${janya.ava}`);
+                        const janyaRawSequence = `${janya.aro} ${janya.ava}`;
                         
                         const jItem = document.createElement('div');
                         jItem.className = 'janya-item';
                         jItem.id = janyaId;
                         
                         jItem.onclick = (e) => {
-                            e.stopPropagation(); // Prevent accordion from toggling
-                            handleRagaSelection(janyaId, janya.name, jShrutiIds, null);
+                            e.stopPropagation(); 
+                            handleRagaSelection(janyaId, janya.name, janyaRawSequence, groupDiv.id);
                         };
 
                         jItem.innerHTML = `
@@ -723,9 +753,46 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             });
         }
 
-        function handleRagaSelection(id, name, swaras, groupId) {
+        // Initialize Chart.js
+        function initChart() {
+            const ctx = document.getElementById('ragaChart').getContext('2d');
+            ragaChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Melodic Sequence Step' } },
+                        y: { title: { display: true, text: 'Pitch Height (Cents)' }, min: -100, max: 1300 }
+                    },
+                    plugins: {
+                        legend: { display: false }, // Using custom HTML legend above
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.raw;
+                                    return `${context.dataset.label}: Note ${point.note} (${point.y} Cents)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function handleRagaSelection(id, name, rawSequenceStr, groupId) {
+            // Extract the unique Shruti IDs for the Periodic Grid highlighting
+            const traceData = extractTraceData(rawSequenceStr, groupId);
+            const swaraSet = new Set();
+            traceData.forEach(d => {
+                let base = d.note.replace(/['.]/g, '');
+                if (carnaticToShruti[base]) swaraSet.add(carnaticToShruti[base]);
+            });
+            const swaras = Array.from(swaraSet);
+
             if (!isCompareMode) {
-                selectedRagas = [{ id, name, swaras, colorIndex: 0, groupId }];
+                selectedRagas = [{ id, name, swaras, rawSequenceStr, groupId, colorIndex: 0 }];
             } else {
                 const existingIndex = selectedRagas.findIndex(r => r.id === id);
                 if (existingIndex > -1) {
@@ -737,22 +804,26 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     }
                     let availableColor = 0;
                     while (selectedRagas.some(r => r.colorIndex === availableColor)) { availableColor++; }
-                    selectedRagas.push({ id, name, swaras, colorIndex: availableColor, groupId });
+                    selectedRagas.push({ id, name, swaras, rawSequenceStr, groupId, colorIndex: availableColor });
                 }
             }
             updateVisuals();
         }
 
         function updateVisuals() {
-            // Reset highlighting
+            // Reset UI
             document.querySelectorAll('.mela-group').forEach(el => el.classList.remove('selected'));
             document.querySelectorAll('.janya-item').forEach(el => el.classList.remove('selected-list-item'));
             document.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
             document.querySelectorAll('.tile').forEach(t => t.style.borderColor = 'var(--border-color)');
             document.getElementById('legend').innerHTML = '';
 
-            // Apply active styles
+            let maxLength = 0;
+            let chartDatasets = [];
+
+            // Apply active styles & build Chart Data
             selectedRagas.forEach(raga => {
+                // Sidebar highlighting
                 if (raga.id.startsWith('mela') && raga.groupId) {
                     document.getElementById(raga.groupId).classList.add('selected');
                 } else if (raga.id.startsWith('janya')) {
@@ -760,20 +831,43 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     if (jEl) jEl.classList.add('selected-list-item');
                 }
                 
+                // HTML Legend
                 const legItem = document.createElement('div');
                 legItem.className = 'legend-item';
                 legItem.innerHTML = `<div class="legend-dot" style="background:${colors[raga.colorIndex]}"></div> ${raga.name}`;
                 document.getElementById('legend').appendChild(legItem);
 
+                // Grid Highlight
                 raga.swaras.forEach(shrutiId => {
                     const dot = document.querySelector(`#dots-${shrutiId} .color-${raga.colorIndex}`);
                     if (dot) dot.classList.add('active');
-                    
                     if (!isCompareMode) {
                         document.getElementById(`tile-${shrutiId}`).style.borderColor = colors[raga.colorIndex];
                     }
                 });
+
+                // Chart Data preparation
+                const traceData = extractTraceData(raga.rawSequenceStr, raga.groupId);
+                if (traceData.length > maxLength) maxLength = traceData.length;
+
+                const dataPoints = traceData.map((d, index) => ({ x: index + 1, y: d.cents, note: d.note }));
+                
+                chartDatasets.push({
+                    label: raga.name,
+                    data: dataPoints,
+                    borderColor: chartColors[raga.colorIndex],
+                    backgroundColor: chartColors[raga.colorIndex],
+                    tension: 0.1, // Slight curve for smoothness
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    spanGaps: true
+                });
             });
+
+            // Update Chart
+            ragaChart.data.labels = Array.from({length: maxLength}, (_, i) => `Step ${i + 1}`);
+            ragaChart.data.datasets = chartDatasets;
+            ragaChart.update();
         }
 
         function toggleCompareMode() {
