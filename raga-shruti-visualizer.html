@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carnatic Raga & 22 Shruti Visualizer</title>
+    <title>Carnatic Raga Visualizer (12/22 Note Toggle)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -29,9 +29,8 @@
             overflow: hidden;
         }
 
-        /* Layout */
         .left-panel {
-            flex: 0 0 400px;
+            flex: 0 0 420px;
             background: var(--panel-bg);
             border-radius: 8px;
             padding: 15px;
@@ -53,7 +52,6 @@
         h2, h3 { margin-top: 0; color: #2c3e50; }
         h2 { border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0;}
 
-        /* Left Panel: Accordion & Pills */
         #raga-list { overflow-y: auto; flex: 1; }
         .mela-group {
             margin-bottom: 8px;
@@ -87,7 +85,6 @@
             border-bottom: 1px dashed #eee;
             display: flex;
             flex-direction: column;
-            cursor: pointer;
             border-radius: 4px;
         }
         .janya-item:hover { background: #f9f9f9; }
@@ -122,7 +119,6 @@
         .s-D { background: #e1bee7; color: #4a148c; } 
         .s-N { background: #f8bbd0; color: #880e4f; } 
 
-        /* Right Panel: Controls & Grid */
         .controls {
             display: flex;
             gap: 10px;
@@ -133,6 +129,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border: 1px solid var(--border-color);
             flex-shrink: 0;
+            flex-wrap: wrap;
         }
         button {
             padding: 6px 12px;
@@ -144,16 +141,18 @@
             transition: opacity 0.2s;
         }
         button:hover { opacity: 0.8; }
+        .btn-select { background-color: #34495e; color: #fff; font-size: 0.75em; padding: 4px 8px; }
+        .btn-select.active { background-color: var(--color-1); }
         #btn-compare { background-color: #f39c12; color: #fff; }
         #btn-compare.active { background-color: #d35400; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
         #btn-reset { background-color: #95a5a6; color: #fff; }
+        #btn-toggle-view { background-color: #8e44ad; color: #fff; }
         
         #legend { display: flex; gap: 12px; font-size: 0.85em; font-weight: bold; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 4px; }
         .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
         .status-msg { font-size: 0.8em; color: #e67e22; font-weight: bold; margin-left: auto; }
 
-        /* Compact Grid */
         .grid-container {
             background: var(--panel-bg);
             padding: 12px;
@@ -163,12 +162,21 @@
             flex-shrink: 0;
         }
         .grid-container h3 { font-size: 1.1em; margin-bottom: 8px; }
+        
         .periodic-table {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             grid-template-rows: repeat(4, 1fr);
             gap: 5px;
         }
+
+        .grid-12 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 8px;
+        }
+
         .tile {
             background: #fff;
             border: 2px solid #bdc3c7;
@@ -206,7 +214,6 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; display: none; }
         .dot.active { display: block; }
         
-        /* Enlarged Chart */
         .chart-container {
             background: var(--panel-bg);
             padding: 15px;
@@ -242,17 +249,17 @@
     </div>
 
     <div class="right-panel">
-        
         <div class="controls">
             <button id="btn-compare">Enable Compare Mode</button>
             <button id="btn-reset">Reset Selection</button>
+            <button id="btn-toggle-view">Switch to 12 Notes</button>
             <div id="legend"></div>
             <div class="status-msg" id="audioStatus">Loading Audio...</div>
         </div>
 
         <div class="grid-container">
-            <h3>22 Shruti Map <span style="font-size:0.7em; font-weight:normal; color:#7f8c8d; margin-left: 10px;">(Click any tile to play its exact frequency)</span></h3>
-            <div class="periodic-table" id="shruti-grid"></div>
+            <h3 id="grid-title">22 Shruti Map <span style="font-size:0.7em; font-weight:normal; color:#7f8c8d; margin-left: 10px;">(Click any tile to play its frequency)</span></h3>
+            <div class="periodic-table" id="swara-grid"></div>
         </div>
 
         <div class="chart-container">
@@ -269,12 +276,19 @@
     </div>
 
     <script>
-        // Audio Engine
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let audioBuffer = null;
         let activeNodes = {};
-        const BASE_FREQ = 261.63; // Middle C reference for exact Hz
+        const BASE_FREQ = 261.63; 
+        
+        let viewMode = '22'; // Toggle between '22' and '12'
+
+        const swaraToSemitone = {
+            'S': 0, 'R1': 1, 'R2': 2, 'R3': 3, 'G1': 2, 'G2': 3, 'G3': 4,
+            'M1': 5, 'M2': 6, 'P': 7, 'D1': 8, 'D2': 9, 'D3': 10,
+            'N1': 9, 'N2': 10, 'N3': 11
+        };
 
         const carnaticToShruti = {
             'S': 1, 'R1': 3, 'R2': 5, 'R3': 7, 'G1': 5, 'G2': 7, 'G3': 8,
@@ -283,25 +297,13 @@
         };
 
         const carnaticFullNames = {
-            'S': 'Shadja (S)',
-            'R1': 'Suddha Re (R1)',
-            'R2': 'Chatusruti Re (R2)',
-            'R3': 'Shatsruti Re (R3)',
-            'G1': 'Suddha Ga (G1)',
-            'G2': 'Sadharana Ga (G2)',
-            'G3': 'Antara Ga (G3)',
-            'M1': 'Suddha Ma (M1)',
-            'M2': 'Prati Ma (M2)',
-            'P': 'Panchama (P)',
-            'D1': 'Suddha Dha (D1)',
-            'D2': 'Chatusruti Dha (D2)',
-            'D3': 'Shatsruti Dha (D3)',
-            'N1': 'Suddha Ni (N1)',
-            'N2': 'Kaisiki Ni (N2)',
-            'N3': 'Kakali Ni (N3)'
+            'S': 'Shadja (S)', 'R1': 'Suddha Re (R1)', 'R2': 'Chatusruti Re (R2)', 'R3': 'Shatsruti Re (R3)',
+            'G1': 'Suddha Ga (G1)', 'G2': 'Sadharana Ga (G2)', 'G3': 'Antara Ga (G3)', 'M1': 'Suddha Ma (M1)',
+            'M2': 'Prati Ma (M2)', 'P': 'Panchama (P)', 'D1': 'Suddha Dha (D1)', 'D2': 'Chatusruti Dha (D2)',
+            'D3': 'Shatsruti Dha (D3)', 'N1': 'Suddha Ni (N1)', 'N2': 'Kaisiki Ni (N2)', 'N3': 'Kakali Ni (N3)'
         };
 
-        const shrutis = [
+        const shrutis22 = [
             { id: 1, name: "Sa", ratio: "1/1", col: 1, row: 1, carnatic: "Shadja (S)" },
             { id: 2, name: "r1 (Atikomal)", ratio: "256/243", col: 2, row: 1, carnatic: "" },
             { id: 3, name: "r2 (Komal)", ratio: "16/15", col: 2, row: 2, carnatic: "Suddha Re (R1)" },
@@ -324,6 +326,21 @@
             { id: 20, name: "n2 (Komal)", ratio: "9/5", col: 7, row: 2, carnatic: "Shatsruti Dha (D3)<br>Kaisiki Ni (N2)" },
             { id: 21, name: "N1 (Shuddha)", ratio: "15/8", col: 7, row: 3, carnatic: "Kakali Ni (N3)" },
             { id: 22, name: "N2 (Tivra)", ratio: "243/128", col: 7, row: 4, carnatic: "" }
+        ];
+
+        const notes12 = [
+            { semitone: 0, name: "Shadja (S)" },
+            { semitone: 1, name: "Suddha Re (R1)" },
+            { semitone: 2, name: "Chatusruti Re (R2)<br>Suddha Ga (G1)" },
+            { semitone: 3, name: "Shatsruti Re (R3)<br>Sadharana Ga (G2)" },
+            { semitone: 4, name: "Antara Ga (G3)" },
+            { semitone: 5, name: "Suddha Ma (M1)" },
+            { semitone: 6, name: "Prati Ma (M2)" },
+            { semitone: 7, name: "Panchama (P)" },
+            { semitone: 8, name: "Suddha Dha (D1)" },
+            { semitone: 9, name: "Chatusruti Dha (D2)<br>Suddha Ni (N1)" },
+            { semitone: 10, name: "Shatsruti Dha (D3)<br>Kaisiki Ni (N2)" },
+            { semitone: 11, name: "Kakali Ni (N3)" }
         ];
 
         function ratioToCents(ratioStr) {
@@ -646,7 +663,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             }).join('');
         }
 
-        // --- THE FIX: Aligned extraction mapping ---
         function extractTraceData(rawStr, parentMelaId = null) {
             let parentAro = '';
             if (parentMelaId) {
@@ -655,7 +671,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             }
 
             const regex = /(S'|R[1-3]'?|G[1-3]'?|M[1-2]'?|P'?|D[1-3]'?|N[1-3]'?|S\.|R[1-3]\.|G[1-3]\.|M[1-2]\.|P\.|D[1-3]\.|N[1-3]\.|S|R|G|M|P|D|N)/g;
-            
             const lines = rawStr.trim().split('\n');
             const isScale = lines.length <= 2; 
 
@@ -681,7 +696,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     let ratio = "1/1";
                     
                     if (shrutiId) {
-                        const shruti = shrutis.find(s => s.id === shrutiId);
+                        const shruti = shrutis22.find(s => s.id === shrutiId);
                         if (shruti) {
                             cents = ratioToCents(shruti.ratio);
                             ratio = shruti.ratio;
@@ -733,7 +748,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     if (ragasDB[parts[1]]) {
                         let aro = fixHighSa(parts[2], true);
                         let ava = fixHighSa(parts[3], false);
-                        ragasDB[parts[1]].janyas.push({ name: parts[0], aro: aro, ava: ava });
+                        ragasDB[parts[1]].janyas.push({ id: parts[0], name: parts[0], aro: aro, ava: ava });
                     }
                 }
             });
@@ -742,6 +757,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
 
             document.getElementById('btn-compare').addEventListener('click', toggleCompareMode);
             document.getElementById('btn-reset').addEventListener('click', resetSelection);
+            document.getElementById('btn-toggle-view').addEventListener('click', toggleViewMode);
             
             audioCtx = new AudioContext();
             try {
@@ -783,36 +799,83 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
         }
 
         function renderGrid() {
-            const grid = document.getElementById('shruti-grid');
-            shrutis.forEach(shruti => {
-                const tile = document.createElement('div');
-                tile.className = 'tile';
-                tile.id = `tile-${shruti.id}`;
-                tile.style.gridColumn = shruti.col;
-                tile.style.gridRow = shruti.row;
+            const grid = document.getElementById('swara-grid');
+            grid.innerHTML = '';
+            
+            if (viewMode === '22') {
+                grid.className = 'periodic-table';
+                document.getElementById('grid-title').innerHTML = '22 Shruti Map <span style="font-size:0.7em; font-weight:normal; color:#7f8c8d; margin-left: 10px;">(Click any tile to play its frequency)</span>';
                 
-                tile.innerHTML = `
-                    <div class="tile-number">${shruti.id}</div>
-                    <div class="tile-ratio">${shruti.ratio}</div>
-                    <div class="tile-name">${shruti.name}</div>
-                    <div class="tile-carnatic" id="tile-carnatic-${shruti.id}">${shruti.carnatic}</div>
-                    <div class="tile-carnatic-dynamic" id="tile-carnatic-dynamic-${shruti.id}"></div>
-                    <div class="dots-container" id="dots-${shruti.id}">
-                        <div class="dot color-0" style="background: var(--color-1)"></div>
-                        <div class="dot color-1" style="background: var(--color-2)"></div>
-                        <div class="dot color-2" style="background: var(--color-3)"></div>
-                    </div>
-                `;
+                shrutis22.forEach(shruti => {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.id = `tile-${shruti.id}`;
+                    tile.style.gridColumn = shruti.col;
+                    tile.style.gridRow = shruti.row;
+                    
+                    tile.innerHTML = `
+                        <div class="tile-number">${shruti.id}</div>
+                        <div class="tile-ratio">${shruti.ratio}</div>
+                        <div class="tile-name">${shruti.name}</div>
+                        <div class="tile-carnatic" id="tile-carnatic-${shruti.id}">${shruti.carnatic}</div>
+                        <div class="tile-carnatic-dynamic" id="tile-carnatic-dynamic-${shruti.id}"></div>
+                        <div class="dots-container" id="dots-${shruti.id}">
+                            <div class="dot color-0" style="background: var(--color-1)"></div>
+                            <div class="dot color-1" style="background: var(--color-2)"></div>
+                            <div class="dot color-2" style="background: var(--color-3)"></div>
+                        </div>
+                    `;
+                    
+                    let multiplier = ratioToMultiplier(shruti.ratio);
+                    tile.onmousedown = () => startMultiplier(multiplier, `tile-${shruti.id}`, tile);
+                    tile.onmouseup = () => stopMultiplier(`tile-${shruti.id}`, tile);
+                    tile.onmouseleave = () => stopMultiplier(`tile-${shruti.id}`, tile);
+                    tile.ontouchstart = (e) => { e.preventDefault(); startMultiplier(multiplier, `tile-${shruti.id}`, tile); };
+                    tile.ontouchend = () => stopMultiplier(`tile-${shruti.id}`, tile);
+                    
+                    grid.appendChild(tile);
+                });
+            } else {
+                grid.className = 'grid-12';
+                document.getElementById('grid-title').innerHTML = '12 Semitone Map <span style="font-size:0.7em; font-weight:normal; color:#7f8c8d; margin-left: 10px;">(Click any tile to play its frequency)</span>';
                 
-                let multiplier = ratioToMultiplier(shruti.ratio);
-                tile.onmousedown = () => startMultiplier(multiplier, `tile-${shruti.id}`, tile);
-                tile.onmouseup = () => stopMultiplier(`tile-${shruti.id}`, tile);
-                tile.onmouseleave = () => stopMultiplier(`tile-${shruti.id}`, tile);
-                tile.ontouchstart = (e) => { e.preventDefault(); startMultiplier(multiplier, `tile-${shruti.id}`, tile); };
-                tile.ontouchend = () => stopMultiplier(`tile-${shruti.id}`, tile);
-                
-                grid.appendChild(tile);
-            });
+                notes12.forEach(note => {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.id = `tile-12-${note.semitone}`;
+                    
+                    tile.innerHTML = `
+                        <div class="tile-name" style="margin-top: 0;">${note.name}</div>
+                        <div class="dots-container" id="dots-12-${note.semitone}">
+                            <div class="dot color-0" style="background: var(--color-1)"></div>
+                            <div class="dot color-1" style="background: var(--color-2)"></div>
+                            <div class="dot color-2" style="background: var(--color-3)"></div>
+                        </div>
+                    `;
+                    
+                    let multiplier = Math.pow(2, note.semitone / 12);
+                    tile.onmousedown = () => startMultiplier(multiplier, `tile-12-${note.semitone}`, tile);
+                    tile.onmouseup = () => stopMultiplier(`tile-12-${note.semitone}`, tile);
+                    tile.onmouseleave = () => stopMultiplier(`tile-12-${note.semitone}`, tile);
+                    tile.ontouchstart = (e) => { e.preventDefault(); startMultiplier(multiplier, `tile-12-${note.semitone}`, tile); };
+                    tile.ontouchend = () => stopMultiplier(`tile-12-${note.semitone}`, tile);
+                    
+                    grid.appendChild(tile);
+                });
+            }
+            updateVisuals();
+        }
+
+        function toggleViewMode() {
+            const btn = document.getElementById('btn-toggle-view');
+            if (viewMode === '22') {
+                viewMode = '12';
+                btn.innerText = "Switch to 22 Shrutis";
+            } else {
+                viewMode = '22';
+                btn.innerText = "Switch to 12 Notes";
+            }
+            renderGrid();
         }
 
         function renderSidebar() {
@@ -829,16 +892,22 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 
                 const headerDiv = document.createElement('div');
                 headerDiv.className = 'mela-header';
-                headerDiv.id = melaId;
                 
                 headerDiv.onclick = function(e) {
+                    if (e.target.tagName.toLowerCase() === 'button') {
+                        e.stopPropagation();
+                        handleRagaSelection(melaId, `${mela.num}. ${mela.name}`, melaRawSequence, groupDiv.id);
+                        return;
+                    }
                     const jContainer = this.nextElementSibling;
                     jContainer.style.display = jContainer.style.display === 'block' ? 'none' : 'block';
-                    handleRagaSelection(melaId, `${mela.num}. ${mela.name}`, melaRawSequence, groupDiv.id);
                 };
 
                 headerDiv.innerHTML = `
-                    <div class="mela-title">${mela.num}. ${mela.name}</div>
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 5px;">
+                        <div class="mela-title" style="margin-bottom:0;">${mela.num}. ${mela.name}</div>
+                        <button class="btn-select" id="btn-${melaId}">Select</button>
+                    </div>
                     <div class="sequence-row"><span class="seq-label">Aro:</span> ${formatSequence(mela.aro)}</div>
                     <div class="sequence-row"><span class="seq-label">Ava:</span> ${formatSequence(mela.ava)}</div>
                 `;
@@ -853,18 +922,22 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                         
                         const jItem = document.createElement('div');
                         jItem.className = 'janya-item';
-                        jItem.id = janyaId;
                         
-                        jItem.onclick = (e) => {
-                            e.stopPropagation(); 
-                            handleRagaSelection(janyaId, janya.name, janyaRawSequence, groupDiv.id);
-                        };
-
                         jItem.innerHTML = `
-                            <div class="janya-title">&#8618; ${janya.name}</div>
+                            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 4px;">
+                                <div class="janya-title" style="margin-bottom:0;">&#8618; ${janya.name}</div>
+                                <button class="btn-select" id="btn-${janyaId}">Select</button>
+                            </div>
                             <div class="sequence-row"><span class="seq-label">Aro:</span> ${formatSequence(janya.aro)}</div>
                             <div class="sequence-row"><span class="seq-label">Ava:</span> ${formatSequence(janya.ava)}</div>
                         `;
+
+                        jItem.onclick = (e) => {
+                            if (e.target.tagName.toLowerCase() === 'button') {
+                                e.stopPropagation(); 
+                                handleRagaSelection(janyaId, janya.name, janyaRawSequence, groupDiv.id);
+                            }
+                        };
                         janyaDiv.appendChild(jItem);
                     });
                 } else {
@@ -938,6 +1011,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
         function handleRagaSelection(id, name, rawSequenceStr, groupId) {
             const traceData = extractTraceData(rawSequenceStr, groupId);
             const swaraSet = new Set();
+            const semitoneSet = new Set();
             const activeCarnaticNamesSet = new Set();
             
             traceData.forEach(d => {
@@ -946,16 +1020,20 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     swaraSet.add(carnaticToShruti[base]);
                     activeCarnaticNamesSet.add(base);
                 }
+                let semi = swaraToSemitone[base];
+                if (semi !== undefined) semitoneSet.add(semi);
             });
             const swaras = Array.from(swaraSet);
+            const semitones = Array.from(semitoneSet);
             const activeCarnaticNames = Array.from(activeCarnaticNamesSet);
 
-            if (!isCompareMode) {
-                selectedRagas = [{ id, name, swaras, activeCarnaticNames, rawSequenceStr, groupId, colorIndex: 0 }];
+            const existingIndex = selectedRagas.findIndex(r => r.id === id);
+
+            if (existingIndex > -1) {
+                selectedRagas.splice(existingIndex, 1);
             } else {
-                const existingIndex = selectedRagas.findIndex(r => r.id === id);
-                if (existingIndex > -1) {
-                    selectedRagas.splice(existingIndex, 1);
+                if (!isCompareMode) {
+                    selectedRagas = [{ id, name, swaras, semitones, activeCarnaticNames, rawSequenceStr, groupId, colorIndex: 0 }];
                 } else {
                     if (selectedRagas.length >= 3) {
                         alert("Compare mode limit is 3 ragas.");
@@ -963,7 +1041,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     }
                     let availableColor = 0;
                     while (selectedRagas.some(r => r.colorIndex === availableColor)) { availableColor++; }
-                    selectedRagas.push({ id, name, swaras, activeCarnaticNames, rawSequenceStr, groupId, colorIndex: availableColor });
+                    selectedRagas.push({ id, name, swaras, semitones, activeCarnaticNames, rawSequenceStr, groupId, colorIndex: availableColor });
                 }
             }
             updateVisuals();
@@ -971,13 +1049,19 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
 
         function updateVisuals() {
             document.querySelectorAll('.mela-group').forEach(el => el.classList.remove('selected'));
-            document.querySelectorAll('.janya-item').forEach(el => el.classList.remove('selected-list-item'));
+            document.querySelectorAll('.btn-select').forEach(el => {
+                el.classList.remove('active');
+                el.innerText = 'Select';
+            });
             document.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
             document.querySelectorAll('.tile').forEach(t => t.style.borderColor = 'var(--border-color)');
             document.getElementById('legend').innerHTML = '';
             
             document.querySelectorAll('.tile-carnatic').forEach(el => el.style.display = 'block');
-            document.querySelectorAll('.tile-carnatic-dynamic').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tile-carnatic-dynamic').forEach(el => {
+                el.style.display = 'none';
+                el.innerHTML = '';
+            });
 
             let chartDatasets = [];
             let chartLabels = [];
@@ -997,12 +1081,16 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 chartLabels = Array.from({length: maxSteps}, (_, i) => `Step ${i + 1}`);
             }
 
+            let tileNamesMap = {};
+
             selectedRagas.forEach((raga, index) => {
                 if (raga.id.startsWith('mela') && raga.groupId) {
                     document.getElementById(raga.groupId).classList.add('selected');
-                } else if (raga.id.startsWith('janya')) {
-                    const jEl = document.getElementById(raga.id);
-                    if (jEl) jEl.classList.add('selected-list-item');
+                }
+                const selectBtn = document.getElementById(`btn-${raga.id}`);
+                if (selectBtn) {
+                    selectBtn.classList.add('active');
+                    selectBtn.innerText = 'Selected';
                 }
                 
                 const legItem = document.createElement('div');
@@ -1010,29 +1098,43 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 legItem.innerHTML = `<div class="legend-dot" style="background:${colors[raga.colorIndex]}"></div> ${raga.name}`;
                 document.getElementById('legend').appendChild(legItem);
 
-                raga.swaras.forEach(shrutiId => {
-                    const dot = document.querySelector(`#dots-${shrutiId} .color-${raga.colorIndex}`);
-                    if (dot) dot.classList.add('active');
-                    if (!isCompareMode) {
-                        document.getElementById(`tile-${shrutiId}`).style.borderColor = colors[raga.colorIndex];
-                    }
-                });
+                if (viewMode === '22') {
+                    raga.swaras.forEach(shrutiId => {
+                        const dot = document.querySelector(`#dots-${shrutiId} .color-${raga.colorIndex}`);
+                        if (dot) dot.classList.add('active');
+                        if (!isCompareMode) {
+                            document.getElementById(`tile-${shrutiId}`).style.borderColor = colors[raga.colorIndex];
+                        }
+                    });
 
-                if (!isCompareMode && selectedRagas.length === 1) {
                     raga.activeCarnaticNames.forEach(baseName => {
                         let shrutiId = carnaticToShruti[baseName];
                         if (shrutiId) {
-                            const defaultLabel = document.getElementById(`tile-carnatic-${shrutiId}`);
-                            const dynamicLabel = document.getElementById(`tile-carnatic-dynamic-${shrutiId}`);
-                            if (defaultLabel) defaultLabel.style.display = 'none';
-                            if (dynamicLabel) {
-                                if(dynamicLabel.style.display === 'block') {
-                                    dynamicLabel.innerHTML += `<br>${carnaticFullNames[baseName]}`;
-                                } else {
-                                    dynamicLabel.innerHTML = carnaticFullNames[baseName];
+                            if (!tileNamesMap[shrutiId]) tileNamesMap[shrutiId] = new Set();
+                            if (!tileNamesMap[shrutiId].has(baseName)) {
+                                tileNamesMap[shrutiId].add(baseName);
+                                const defaultLabel = document.getElementById(`tile-carnatic-${shrutiId}`);
+                                const dynamicLabel = document.getElementById(`tile-carnatic-dynamic-${shrutiId}`);
+                                if (defaultLabel) defaultLabel.style.display = 'none';
+                                if (dynamicLabel) {
                                     dynamicLabel.style.display = 'block';
+                                    let textColor = isCompareMode ? chartColors[raga.colorIndex] : '#d35400';
+                                    let nameHtml = `<span style="color: ${textColor};">${carnaticFullNames[baseName]}</span>`;
+                                    if (dynamicLabel.innerHTML === '') {
+                                        dynamicLabel.innerHTML = nameHtml;
+                                    } else {
+                                        dynamicLabel.innerHTML += `<br>${nameHtml}`;
+                                    }
                                 }
                             }
+                        }
+                    });
+                } else {
+                    raga.semitones.forEach(semi => {
+                        const dot = document.querySelector(`#dots-12-${semi} .color-${raga.colorIndex}`);
+                        if (dot) dot.classList.add('active');
+                        if (!isCompareMode) {
+                            document.getElementById(`tile-12-${semi}`).style.borderColor = colors[raga.colorIndex];
                         }
                     });
                 }
