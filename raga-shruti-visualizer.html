@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carnatic Raga & 22 Shruti Visualizer</title>
+    <!-- Include Chart.js for the graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -213,7 +214,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border: 1px solid var(--border-color);
             position: relative;
-            flex: 1; 
+            flex: 1;
             min-height: 300px;
             display: flex;
             flex-direction: column;
@@ -225,7 +226,6 @@
         }
 
         .selected-list-item { background-color: #f1c40f1a !important; box-shadow: inset 3px 0 0 #f39c12; }
-
     </style>
 </head>
 <body>
@@ -250,7 +250,7 @@
         </div>
 
         <div class="chart-container">
-            <h3 style="font-size: 1.1em; margin-bottom: 10px;">Frequency Contour Graph</h3>
+            <h3 style="font-size: 1.1em; margin-bottom: 10px;">Frequency Contour Graph <span style="font-size:0.7em; font-weight:normal; color:#7f8c8d; margin-left: 10px;">(Hover over any point to hear the exact frequency)</span></h3>
             <div class="chart-wrapper">
                 <canvas id="ragaChart"></canvas>
             </div>
@@ -263,7 +263,7 @@
         let audioCtx;
         let audioBuffer = null;
         let activeNodes = {};
-        const BASE_FREQ = 261.63; // Middle C reference
+        const BASE_FREQ = 261.63; // Middle C reference for exact Hz
 
         const carnaticToShruti = {
             'S': 1, 'R1': 3, 'R2': 5, 'R3': 7, 'G1': 5, 'G2': 7, 'G3': 8,
@@ -305,7 +305,7 @@
             return parseInt(n) / parseInt(d);
         }
 
-        // Auto-correct the high Sa 
+        // Auto-correct the high Sa
         function fixHighSa(swaraStr, isArohana) {
             let swaras = swaraStr.trim().split(/\s+/);
             if (isArohana && swaras[swaras.length - 1] === 'S') swaras[swaras.length - 1] = "S'";
@@ -603,6 +603,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
         let isCompareMode = false;
         let selectedRagas = [];
         let ragaChart = null;
+        let currentlyHoveredNodeId = null;
         
         const chartColors = ['#e74c3c', '#3498db', '#2ecc71'];
         const colors = ['var(--color-1)', 'var(--color-2)', 'var(--color-3)'];
@@ -640,6 +641,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 let shrutiId = carnaticToShruti[base];
                 let cents = 0;
                 let ratio = "1/1";
+                let multiplier = 1;
                 
                 if (shrutiId) {
                     const shruti = shrutis.find(s => s.id === shrutiId);
@@ -651,8 +653,10 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 else if (base === 'P') { cents = ratioToCents("3/2"); ratio = "3/2"; }
 
                 cents += (octaveOffset * 1200);
+                multiplier = ratioToMultiplier(ratio) * Math.pow(2, octaveOffset);
+                let hz = BASE_FREQ * multiplier;
 
-                return { note: note, cents: Math.round(cents), ratio: ratio };
+                return { note: note, cents: Math.round(cents), ratio: ratio, hz: hz.toFixed(2), multiplier: multiplier };
             });
         }
 
@@ -660,7 +664,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             renderGrid();
             initChart();
             
-            // Apply high Sa correction logic during parsing
             melaData.trim().split('\n').forEach(line => {
                 let parts = line.split('|').map(s => s.trim());
                 if(parts.length === 4) {
@@ -686,7 +689,6 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             document.getElementById('btn-compare').addEventListener('click', toggleCompareMode);
             document.getElementById('btn-reset').addEventListener('click', resetSelection);
             
-            // Audio init
             audioCtx = new AudioContext();
             try {
                 const response = await fetch('harmonium-kannan-orig.wav');
@@ -700,13 +702,10 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             }
         }
 
-        // --- AUDIO ENGINE ---
-        function startRatio(ratioStr, uiElement = null) {
-            if (!audioBuffer) return;
+        function startMultiplier(multiplier, nodeId, uiElement = null) {
+            if (!audioBuffer || activeNodes[nodeId]) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
             
-            const multiplier = ratioToMultiplier(ratioStr);
-
             const source = audioCtx.createBufferSource();
             const gainNode = audioCtx.createGain();
             source.buffer = audioBuffer;
@@ -715,16 +714,16 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
             gainNode.connect(audioCtx.destination);
             source.start(0);
             
-            activeNodes[ratioStr] = { source, gainNode };
+            activeNodes[nodeId] = { source, gainNode };
             if (uiElement) uiElement.classList.add('playing');
         }
 
-        function stopRatio(ratioStr, uiElement = null) {
-            if (activeNodes[ratioStr]) {
-                const { source, gainNode } = activeNodes[ratioStr];
+        function stopMultiplier(nodeId, uiElement = null) {
+            if (activeNodes[nodeId]) {
+                const { source, gainNode } = activeNodes[nodeId];
                 gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.015);
                 source.stop(audioCtx.currentTime + 0.1);
-                delete activeNodes[ratioStr];
+                delete activeNodes[nodeId];
             }
             if (uiElement) uiElement.classList.remove('playing');
         }
@@ -750,12 +749,12 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     </div>
                 `;
                 
-                // Audio bindings
-                tile.onmousedown = () => startRatio(shruti.ratio, tile);
-                tile.onmouseup = () => stopRatio(shruti.ratio, tile);
-                tile.onmouseleave = () => stopRatio(shruti.ratio, tile);
-                tile.ontouchstart = (e) => { e.preventDefault(); startRatio(shruti.ratio, tile); };
-                tile.ontouchend = () => stopRatio(shruti.ratio, tile);
+                let multiplier = ratioToMultiplier(shruti.ratio);
+                tile.onmousedown = () => startMultiplier(multiplier, `tile-${shruti.id}`, tile);
+                tile.onmouseup = () => stopMultiplier(`tile-${shruti.id}`, tile);
+                tile.onmouseleave = () => stopMultiplier(`tile-${shruti.id}`, tile);
+                tile.ontouchstart = (e) => { e.preventDefault(); startMultiplier(multiplier, `tile-${shruti.id}`, tile); };
+                tile.ontouchend = () => stopMultiplier(`tile-${shruti.id}`, tile);
                 
                 grid.appendChild(tile);
             });
@@ -831,9 +830,29 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onHover: (event, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const element = elements[0];
+                            const dataPoint = chart.data.datasets[element.datasetIndex].data[element.index];
+                            const nodeId = `chart-${element.datasetIndex}-${element.index}`;
+                            
+                            if (currentlyHoveredNodeId !== nodeId) {
+                                if (currentlyHoveredNodeId) {
+                                    stopMultiplier(currentlyHoveredNodeId);
+                                }
+                                startMultiplier(dataPoint.multiplier, nodeId);
+                                currentlyHoveredNodeId = nodeId;
+                            }
+                        } else {
+                            if (currentlyHoveredNodeId) {
+                                stopMultiplier(currentlyHoveredNodeId);
+                                currentlyHoveredNodeId = null;
+                            }
+                        }
+                    },
                     scales: {
                         x: { title: { display: false } },
-                        y: { title: { display: true, text: 'Pitch Height (Cents)' }, min: 0, max: 1300 }
+                        y: { title: { display: true, text: 'Frequency (Hz)' } }
                     },
                     plugins: {
                         legend: { display: false }, 
@@ -841,8 +860,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                             callbacks: {
                                 label: function(context) {
                                     const point = context.raw;
-                                    const freq = (BASE_FREQ * ratioToMultiplier(point.ratio)).toFixed(2);
-                                    return `${context.dataset.label}: ${point.cents} Cents (${freq} Hz)`;
+                                    return `${context.dataset.label}: ${point.hz} Hz (${point.cents} Cents)`;
                                 },
                                 title: function(tooltipItems) {
                                     return "Swara: " + tooltipItems[0].raw.note;
@@ -850,6 +868,13 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                             }
                         }
                     }
+                }
+            });
+
+            document.getElementById('ragaChart').addEventListener('mouseout', () => {
+                if (currentlyHoveredNodeId) {
+                    stopMultiplier(currentlyHoveredNodeId);
+                    currentlyHoveredNodeId = null;
                 }
             });
         }
@@ -924,7 +949,7 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     for(let i = chartLabels.length; i < traceData.length; i++) chartLabels.push(traceData[i].note);
                 }
 
-                const dataPoints = traceData.map((d, i) => ({ x: chartLabels[i], y: d.cents, note: d.note, ratio: d.ratio }));
+                const dataPoints = traceData.map((d, i) => ({ x: chartLabels[i], y: d.hz, note: d.note, ratio: d.ratio, multiplier: d.multiplier }));
                 
                 chartDatasets.push({
                     label: raga.name,
@@ -933,7 +958,8 @@ amRuthavarshiNi |66| S G3 M2 P N3 S | S N3 P M2 G3 S`;
                     backgroundColor: chartColors[raga.colorIndex],
                     tension: 0.1, 
                     borderWidth: 2,
-                    pointRadius: 4,
+                    pointRadius: 6,
+                    hoverRadius: 10,
                     spanGaps: true
                 });
             });
