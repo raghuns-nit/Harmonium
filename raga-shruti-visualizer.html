@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>22 Shruti Raga Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --panel-bg: #fff;
+            --border-color: #ddd;
+            --color-1: #e74c3c; /* Red */
+            --color-2: #3498db; /* Blue */
+            --color-3: #2ecc71; /* Green */
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* Layout */
+        .left-panel {
+            flex: 0 0 300px;
+            background: var(--panel-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+        
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        h2, h3, h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        /* Raga List Styles */
+        .melakarta-group {
+            margin-bottom: 15px;
+        }
+        .mela-title {
+            font-weight: bold;
+            padding: 8px;
+            background: #ecf0f1;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .mela-title:hover {
+            background: #bdc3c7;
+        }
+        .janya-list {
+            list-style: none;
+            padding-left: 15px;
+            margin: 5px 0 0 0;
+        }
+        .janya-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        .janya-item:hover {
+            background: #f1f2f6;
+        }
+        
+        /* Selection Highlight in Sidebar */
+        .raga-selected {
+            font-weight: bold;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.8; }
+        #btn-compare { background-color: #f39c12; color: #fff; }
+        #btn-compare.active { background-color: #d35400; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        #btn-reset { background-color: #95a5a6; color: #fff; }
+        
+        #legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+        }
+
+        /* 22 Shruti Grid (Periodic Table Style) */
+        .grid-container {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+        .periodic-table {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .tile {
+            background: #fff;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            padding: 10px 5px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 80px;
+            transition: all 0.3s;
+        }
+        .tile-number {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            font-size: 0.75em;
+            color: #7f8c8d;
+            font-weight: bold;
+        }
+        .tile-ratio {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            font-size: 0.7em;
+            color: #95a5a6;
+        }
+        .tile-name {
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .tile-carnatic {
+            font-size: 0.7em;
+            color: #e67e22;
+            margin-top: 4px;
+        }
+        
+        /* Dots for selected Ragas */
+        .dots-container {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 8px;
+            height: 12px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: none;
+        }
+        .dot.active { display: block; }
+        
+        /* Info Panel */
+        .info-panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .info-panel h4 { margin-top: 0; color: #d35400; }
+        .info-panel ul { padding-left: 20px; margin-bottom: 0; }
+        .info-panel li { margin-bottom: 10px; }
+        .cite { color: #7f8c8d; font-size: 0.85em; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Left Sidebar: Raga List -->
+    <div class="left-panel">
+        <h2>Raga Library</h2>
+        <div id="raga-list-container"></div>
+    </div>
+
+    <!-- Right Area: Visualizer & Info -->
+    <div class="right-panel">
+        
+        <!-- Top Controls -->
+        <div class="controls">
+            <button id="btn-compare">Enable Compare Mode</button>
+            <button id="btn-reset">Reset Selection</button>
+            <div id="legend"></div>
+        </div>
+
+        <!-- 22 Shruti Grid -->
+        <div class="grid-container">
+            <h3>22 Shruti "Periodic Table"</h3>
+            <div class="periodic-table" id="shruti-grid">
+                <!-- Tiles injected by JS -->
+            </div>
+        </div>
+
+        <!-- Research Info -->
+        <div class="info-panel">
+            <h4>Research & Logic Behind 22 Shrutis</h4>
+            <ul>
+                <li><strong>What are Shrutis?</strong> While there are 12 universally identifiable notes in an octave, human perception of these 12 changes exactly at 22 points given by nature, known as the 22 Shrutis <span class="cite"></span>.</li>
+                <li><strong>The Mathematical Ratios:</strong> Each Shruti is defined by a precise natural mathematical ratio (e.g., 256/243 for Atikomal Rishabh) <span class="cite"></span>. Based on Galileo's law of inverse proportionality, these ratios represent the exact physical location on a string where the note is perfectly playable <span class="cite"></span>.</li>
+                <li><strong>Shruti-Nirman Chakra:</strong> The frequencies are not arbitrary. They arise logically in 5 groups of 4 shrutis each, appearing sequentially at set percentage distances (like 5.34%, 6.66%, 11.11%, and 12.5%) <span class="cite"></span>.</li>
+                <li><strong>Cosmic Connection (Periodic Table):</strong> A fascinating discovery shows that the atomic mass of elements in the periodic table matches the 22 Shrutis to a 99% accuracy, suggesting the universal code of creation and music are identical <span class="cite"></span>.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Data: Mapping 22 Shrutis to standard layout positions
+        // Column mapping: 1=Sa, 2=Re, 3=Ga, 4=Ma, 5=Pa, 6=Dha, 7=Ni
+        const shrutis = [
+            { id: 1, name: "Sa", ratio: "1/1", col: 1, row: 1, carnatic: "Shadja (S)" },
+            
+            { id: 2, name: "r1 (Atikomal)", ratio: "256/243", col: 2, row: 1, carnatic: "" },
+            { id: 3, name: "r2 (Komal)", ratio: "16/15", col: 2, row: 2, carnatic: "Suddha Re (R1)" },
+            { id: 4, name: "R1 (Shuddha)", ratio: "10/9", col: 2, row: 3, carnatic: "" },
+            { id: 5, name: "R2 (Tivra Shuddha)", ratio: "9/8", col: 2, row: 4, carnatic: "Chatusruti Re (R2) / Suddha Ga (G1)" },
+            
+            { id: 6, name: "g1 (Atikomal)", ratio: "32/27", col: 3, row: 1, carnatic: "" },
+            { id: 7, name: "g2 (Komal)", ratio: "6/5", col: 3, row: 2, carnatic: "Shatsruti Re (R3) / Sadharana Ga (G2)" },
+            { id: 8, name: "G1 (Shuddha)", ratio: "5/4", col: 3, row: 3, carnatic: "Antara Ga (G3)" },
+            { id: 9, name: "G2 (Tivra Shuddha)", ratio: "81/64", col: 3, row: 4, carnatic: "" },
+            
+            { id: 10, name: "M1 (Shuddha)", ratio: "4/3", col: 4, row: 1, carnatic: "Suddha Ma (M1)" },
+            { id: 11, name: "M2 (Ek Shruti)", ratio: "27/20", col: 4, row: 2, carnatic: "" },
+            { id: 12, name: "m1 (Tivra)", ratio: "45/32", col: 4, row: 3, carnatic: "Prati Ma (M2)" },
+            { id: 13, name: "m2 (Tivratama)", ratio: "729/512", col: 4, row: 4, carnatic: "" },
+            
+            { id: 14, name: "Pa", ratio: "3/2", col: 5, row: 1, carnatic: "Panchama (P)" },
+            
+            { id: 15, name: "d1 (Atikomal)", ratio: "128/81", col: 6, row: 1, carnatic: "" },
+            { id: 16, name: "d2 (Komal)", ratio: "8/5", col: 6, row: 2, carnatic: "Suddha Dha (D1)" },
+            { id: 17, name: "D1 (Shuddha)", ratio: "5/3", col: 6, row: 3, carnatic: "" },
+            { id: 18, name: "D2 (Tivra Shuddha)", ratio: "27/16", col: 6, row: 4, carnatic: "Chatusruti Dha (D2) / Suddha Ni (N1)" },
+            
+            { id: 19, name: "n1 (Atikomal)", ratio: "16/9", col: 7, row: 1, carnatic: "" },
+            { id: 20, name: "n2 (Komal)", ratio: "9/5", col: 7, row: 2, carnatic: "Shatsruti Dha (D3) / Kaisiki Ni (N2)" },
+            { id: 21, name: "N1 (Shuddha)", ratio: "15/8", col: 7, row: 3, carnatic: "Kakali Ni (N3)" },
+            { id: 22, name: "N2 (Tivra Shuddha)", ratio: "243/128", col: 7, row: 4, carnatic: "" }
+        ];
+
+        // Data: Sample of Melakartas and Janyas with their 22-Shruti mapping
+        const ragaLibrary = [
+            {
+                name: "15. Mayamalavagowla",
+                swaras: [1, 3, 8, 10, 14, 16, 21], 
+                janyas: [
+                    { name: "Bowli", swaras: [1, 3, 8, 14, 16] },
+                    { name: "Jaganmohini", swaras: [1, 8, 10, 14, 21] }
+                ]
+            },
+            {
+                name: "20. Natabhairavi",
+                swaras: [1, 5, 7, 10, 14, 16, 20], 
+                janyas: [
+                    { name: "Hindolam", swaras: [1, 7, 10, 16, 20] },
+                    { name: "Anandabhairavi", swaras: [1, 5, 7, 10, 14, 18, 20] } 
+                ]
+            },
+            {
+                name: "22. Kharaharapriya",
+                swaras: [1, 5, 7, 10, 14, 18, 20], 
+                janyas: [
+                    { name: "Abheri", swaras: [1, 5, 7, 10, 14, 18, 20] },
+                    { name: "Madhyamavati", swaras: [1, 5, 10, 14, 20] },
+                    { name: "Sriranjani", swaras: [1, 5, 7, 10, 18, 20] }
+                ]
+            },
+            {
+                name: "28. Harikambhoji",
+                swaras: [1, 5, 8, 10, 14, 18, 20], 
+                janyas: [
+                    { name: "Mohanam", swaras: [1, 5, 8, 14, 18] },
+                    { name: "Kambhoji", swaras: [1, 5, 8, 10, 14, 18, 20] }
+                ]
+            },
+            {
+                name: "29. Sankarabharanam",
+                swaras: [1, 5, 8, 10, 14, 18, 21], 
+                janyas: [
+                    { name: "Hamsadhvani", swaras: [1, 5, 8, 14, 21] },
+                    { name: "Begada", swaras: [1, 5, 8, 10, 14, 18, 20, 21] } 
+                ]
+            }
+        ];
+
+        // State variables
+        let isCompareMode = false;
+        let selectedRagas = []; // Max 3 items: { id, name, swaras, color }
+        const colors = ['var(--color-1)', 'var(--color-2)', 'var(--color-3)'];
+
+        // DOM Elements
+        const ragaListContainer = document.getElementById('raga-list-container');
+        const shrutiGrid = document.getElementById('shruti-grid');
+        const btnCompare = document.getElementById('btn-compare');
+        const btnReset = document.getElementById('btn-reset');
+        const legend = document.getElementById('legend');
+
+        // Initialize UI
+        function init() {
+            renderSidebar();
+            renderGrid();
+            
+            btnCompare.addEventListener('click', toggleCompareMode);
+            btnReset.addEventListener('click', resetSelection);
+        }
+
+        // Render Sidebar
+        function renderSidebar() {
+            ragaLibrary.forEach((mela, mIndex) => {
+                const group = document.createElement('div');
+                group.className = 'melakarta-group';
+                
+                const melaId = `mela-${mIndex}`;
+                const melaTitle = document.createElement('div');
+                melaTitle.className = 'mela-title';
+                melaTitle.id = melaId;
+                melaTitle.innerText = mela.name;
+                melaTitle.onclick = () => handleRagaSelection(melaId, mela.name, mela.swaras);
+                
+                const janyaList = document.createElement('ul');
+                janyaList.className = 'janya-list';
+                
+                mela.janyas.forEach((janya, jIndex) => {
+                    const janyaId = `janya-${mIndex}-${jIndex}`;
+                    const janyaItem = document.createElement('li');
+                    janyaItem.className = 'janya-item';
+                    janyaItem.id = janyaId;
+                    janyaItem.innerText = `↳ ${janya.name}`;
+                    janyaItem.onclick = () => handleRagaSelection(janyaId, janya.name, janya.swaras);
+                    janyaList.appendChild(janyaItem);
+                });
+                
+                group.appendChild(melaTitle);
+                group.appendChild(janyaList);
+                ragaListContainer.appendChild(group);
+            });
+        }
+
+        // Render Periodic Grid
+        function renderGrid() {
+            shrutis.forEach(shruti => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.id = `tile-${shruti.id}`;
+                tile.style.gridColumn = shruti.col;
+                tile.style.gridRow = shruti.row;
+                
+                tile.innerHTML = `
+                    <div class="tile-number">${shruti.id}</div>
+                    <div class="tile-ratio">${shruti.ratio}</div>
+                    <div class="tile-name">${shruti.name}</div>
+                    <div class="tile-carnatic">${shruti.carnatic}</div>
+                    <div class="dots-container" id="dots-${shruti.id}">
+                        <div class="dot color-0" style="background: var(--color-1)"></div>
+                        <div class="dot color-1" style="background: var(--color-2)"></div>
+                        <div class="dot color-2" style="background: var(--color-3)"></div>
+                    </div>
+                `;
+                shrutiGrid.appendChild(tile);
+            });
+        }
+
+        // Handle Raga Click
+        function handleRagaSelection(id, name, swaras) {
+            if (!isCompareMode) {
+                selectedRagas = [{ id, name, swaras, colorIndex: 0 }];
+            } else {
+                const existingIndex = selectedRagas.findIndex(r => r.id === id);
+                if (existingIndex > -1) {
+                    // Deselect if already selected
+                    selectedRagas.splice(existingIndex, 1);
+                } else {
+                    // Add new if limit not reached
+                    if (selectedRagas.length >= 3) {
+                        alert("You can only compare up to 3 ragas at once.");
+                        return;
+                    }
+                    // Find an available color index (0, 1, or 2)
+                    let availableColor = 0;
+                    while (selectedRagas.some(r => r.colorIndex === availableColor)) {
+                        availableColor++;
+                    }
+                    selectedRagas.push({ id, name, swaras, colorIndex: availableColor });
+                }
+            }
+            updateVisuals();
+        }
+
+        // Update Visual State
+        function updateVisuals() {
+            // Reset sidebar highlights
+            document.querySelectorAll('.mela-title, .janya-item').forEach(el => {
+                el.classList.remove('raga-selected');
+                el.style.color = 'var(--text-color)';
+            });
+            
+            // Reset grid
+            document.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tile').forEach(t => t.style.borderColor = 'var(--border-color)');
+
+            // Reset Legend
+            legend.innerHTML = '';
+
+            // Apply new state
+            selectedRagas.forEach(raga => {
+                // Highlight sidebar
+                const uiEl = document.getElementById(raga.id);
+                if (uiEl) {
+                    uiEl.classList.add('raga-selected');
+                    uiEl.style.color = colors[raga.colorIndex];
+                }
+                
+                // Add to Legend
+                const legItem = document.createElement('div');
+                legItem.className = 'legend-item';
+                legItem.innerHTML = `<div class="legend-dot" style="background:${colors[raga.colorIndex]}"></div> ${raga.name}`;
+                legend.appendChild(legItem);
+
+                // Highlight Grid Dots
+                raga.swaras.forEach(shrutiId => {
+                    const dot = document.querySelector(`#dots-${shrutiId} .color-${raga.colorIndex}`);
+                    if (dot) dot.classList.add('active');
+                    
+                    // Thicken border if single selection for cleaner look
+                    if (!isCompareMode) {
+                        document.getElementById(`tile-${shrutiId}`).style.borderColor = colors[raga.colorIndex];
+                    }
+                });
+            });
+        }
+
+        // Button Listeners
+        function toggleCompareMode() {
+            isCompareMode = !isCompareMode;
+            if (isCompareMode) {
+                btnCompare.classList.add('active');
+                btnCompare.innerText = "Compare Mode: ON";
+            } else {
+                btnCompare.classList.remove('active');
+                btnCompare.innerText = "Enable Compare Mode";
+                // If turning off, reduce selection to just the first one
+                if (selectedRagas.length > 1) {
+                    selectedRagas = [selectedRagas[0]];
+                    selectedRagas[0].colorIndex = 0;
+                    updateVisuals();
+                }
+            }
+        }
+
+        function resetSelection() {
+            selectedRagas = [];
+            updateVisuals();
+        }
+
+        // Run
+        init();
+    </script>
+</body>
+</html>
