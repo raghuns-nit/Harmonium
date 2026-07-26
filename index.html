@@ -197,78 +197,78 @@ S' N D P M G R S</textarea>
         let activeLaptopKeyMap = {};
         const laptopKeysRow = ['e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']'];
 
-        const melaRaw = `kanakAn'gi                 | S R1 G1 M1 P D1 N1 S | S N1 D1 P M1 G1 R1 S
-rathnAn'gi                 | S R1 G1 M1 P D1 N2 S | S N2 D1 P M1 G1 R1 S
-gAnamUrthi                 | S R1 G1 M1 P D1 N3 S | S N3 D1 P M1 G1 R1 S
-vanaspathi                 | S R1 G1 M1 P D2 N2 S | S N2 D2 P M1 G1 R1 S
-mAnavathi                  | S R1 G1 M1 P D2 N3 S | S N3 D2 P M1 G1 R1 S
-thAnarUpi                  | S R1 G1 M1 P D3 N3 S | S N3 D3 P M1 G1 R1 S
-sEnAvathi                  | S R1 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R1 S
-HanumathOdi                | S R1 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R1 S
-DhEnukA                    | S R1 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R1 S
-nAtakapriya                | S R1 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R1 S
-kOkilapriya                | S R1 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R1 S
-rUpavathi                  | S R1 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R1 S
-gAyakapriya                | S R1 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R1 S
-vakulAbharaNam             | S R1 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R1 S
-mAyAmALava gowLA           | S R1 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R1 S
-chakravAkam                | S R1 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R1 S
-sUryakAntam                | S R1 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R1 S
-HAtakAmbari                | S R1 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R1 S
-Jan'kAradhvani             | S R2 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R2 S
-naTabhairavi               | S R2 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R2 S
-kIravANi                   | S R2 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R2 S
-KaraHarapriya              | S R2 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R2 S
-gowrimanOHari              | S R2 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R2 S
-varuNapriya                | S R2 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R2 S
-mAraranjani                | S R2 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R2 S
-chArukeshi                 | S R2 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R2 S
-sarasAn'gi                 | S R2 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R2 S
-HarikAmbhOji               | S R2 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R2 S
-DhIrashan'karAbharaNam     | S R2 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R2 S
-nAgAnandhini               | S R2 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R2 S
-yAgapriya                  | S R3 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R3 S
-rAgavarDhani               | S R3 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R3 S
-gAn'geyabhushani           | S R3 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R3 S
-vAgaDhIsvari               | S R3 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R3 S
-shUlini                    | S R3 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R3 S
-chalanAta                  | S R3 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R3 S
-sAlagam                    | S R1 G1 M2 P D1 N1 S | S N1 D1 P M2 G1 R1 S
-jalArnavam                 | S R1 G1 M2 P D1 N2 S | S N2 D1 P M2 G1 R1 S
-JAlavarALi                 | S R1 G1 M2 P D1 N3 S | S N3 D1 P M2 G1 R1 S
-navanItham                 | S R1 G1 M2 P D2 N2 S | S N2 D2 P M2 G1 R1 S
-pAvani                     | S R1 G1 M2 P D2 N3 S | S N3 D2 P M2 G1 R1 S
-raGupriya                  | S R1 G1 M2 P D3 N3 S | S N3 D3 P M2 G1 R1 S
-gavAmbodhi                 | S R1 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R1 S
-bhavapriya                 | S R1 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R1 S
-shubhapanthuvarALi         | S R1 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R1 S
-shadhvidha mArgiNi         | S R1 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R1 S
-suvarNAn'gi                | S R1 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R1 S
-dhivyAmaNi                 | S R1 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R1 S
-dhavalAmbari               | S R1 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R1 S
-nAmanArAyaNi               | S R1 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R1 S
-kAmavardhini               | S R1 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R1 S
-rAmapriya                  | S R1 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R1 S
-gamanashrama               | S R1 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R1 S
-vishvAmbhari               | S R1 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R1 S
-shyAmaLAngi                | S R2 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R2 S
-shanmuKapriya              | S R2 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R2 S
-simHendra madhyamam        | S R2 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R2 S
-HemAvathi                  | S R2 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R2 S
-DharmAvathi                | S R2 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R2 S
-nIthimathi                 | S R2 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R2 S
-kAnthAmaNi                 | S R2 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R2 S
-rishabhapriya              | S R2 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R2 S
-lathAngi                   | S R2 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R2 S
-vAchaspathi                | S R2 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R2 S
-mEchakalyANi               | S R2 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R2 S
-chithrAmbari               | S R2 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R2 S
-sucharithra                | S R3 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R3 S
-jyothisvarUpiNi            | S R3 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R3 S
-dhAtuvardhani              | S R3 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R3 S
-nAsika bhUshaNi            | S R3 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R3 S
-kosalam                    | S R3 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R3 S
-rasikapriya                | S R3 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R3 S`;
+        const melaRaw = `1 | kanakAn'gi                 | S R1 G1 M1 P D1 N1 S | S N1 D1 P M1 G1 R1 S
+2 | rathnAn'gi                 | S R1 G1 M1 P D1 N2 S | S N2 D1 P M1 G1 R1 S
+3 | gAnamUrthi                 | S R1 G1 M1 P D1 N3 S | S N3 D1 P M1 G1 R1 S
+4 | vanaspathi                 | S R1 G1 M1 P D2 N2 S | S N2 D2 P M1 G1 R1 S
+5 | mAnavathi                  | S R1 G1 M1 P D2 N3 S | S N3 D2 P M1 G1 R1 S
+6 | thAnarUpi                  | S R1 G1 M1 P D3 N3 S | S N3 D3 P M1 G1 R1 S
+7 | sEnAvathi                  | S R1 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R1 S
+8 | HanumathOdi                | S R1 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R1 S
+9 | DhEnukA                    | S R1 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R1 S
+10 | nAtakapriya                | S R1 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R1 S
+11 | kOkilapriya                | S R1 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R1 S
+12 | rUpavathi                  | S R1 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R1 S
+13 | gAyakapriya                | S R1 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R1 S
+14 | vakulAbharaNam             | S R1 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R1 S
+15 | mAyAmALava gowLA           | S R1 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R1 S
+16 | chakravAkam                | S R1 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R1 S
+17 | sUryakAntam                | S R1 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R1 S
+18 | HAtakAmbari                | S R1 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R1 S
+19 | Jan'kAradhvani             | S R2 G2 M1 P D1 N1 S | S N1 D1 P M1 G2 R2 S
+20 | naTabhairavi               | S R2 G2 M1 P D1 N2 S | S N2 D1 P M1 G2 R2 S
+21 | kIravANi                   | S R2 G2 M1 P D1 N3 S | S N3 D1 P M1 G2 R2 S
+22 | KaraHarapriya              | S R2 G2 M1 P D2 N2 S | S N2 D2 P M1 G2 R2 S
+23 | gowrimanOHari              | S R2 G2 M1 P D2 N3 S | S N3 D2 P M1 G2 R2 S
+24 | varuNapriya                | S R2 G2 M1 P D3 N3 S | S N3 D3 P M1 G2 R2 S
+25 | mAraranjani                | S R2 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R2 S
+26 | chArukeshi                 | S R2 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R2 S
+27 | sarasAn'gi                 | S R2 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R2 S
+28 | HarikAmbhOji               | S R2 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R2 S
+29 | DhIrashan'karAbharaNam     | S R2 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R2 S
+30 | nAgAnandhini               | S R2 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R2 S
+31 | yAgapriya                  | S R3 G3 M1 P D1 N1 S | S N1 D1 P M1 G3 R3 S
+32 | rAgavarDhani               | S R3 G3 M1 P D1 N2 S | S N2 D1 P M1 G3 R3 S
+33 | gAn'geyabhushani           | S R3 G3 M1 P D1 N3 S | S N3 D1 P M1 G3 R3 S
+34 | vAgaDhIsvari               | S R3 G3 M1 P D2 N2 S | S N2 D2 P M1 G3 R3 S
+35 | shUlini                    | S R3 G3 M1 P D2 N3 S | S N3 D2 P M1 G3 R3 S
+36 | chalanAta                  | S R3 G3 M1 P D3 N3 S | S N3 D3 P M1 G3 R3 S
+37 | sAlagam                    | S R1 G1 M2 P D1 N1 S | S N1 D1 P M2 G1 R1 S
+38 | jalArnavam                 | S R1 G1 M2 P D1 N2 S | S N2 D1 P M2 G1 R1 S
+39 | JAlavarALi                 | S R1 G1 M2 P D1 N3 S | S N3 D1 P M2 G1 R1 S
+40 | navanItham                 | S R1 G1 M2 P D2 N2 S | S N2 D2 P M2 G1 R1 S
+41 | pAvani                     | S R1 G1 M2 P D2 N3 S | S N3 D2 P M2 G1 R1 S
+42 | raGupriya                  | S R1 G1 M2 P D3 N3 S | S N3 D3 P M2 G1 R1 S
+43 | gavAmbodhi                 | S R1 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R1 S
+44 | bhavapriya                 | S R1 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R1 S
+45 | shubhapanthuvarALi         | S R1 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R1 S
+46 | shadhvidha mArgiNi         | S R1 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R1 S
+47 | suvarNAn'gi                | S R1 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R1 S
+48 | dhivyAmaNi                 | S R1 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R1 S
+49 | dhavalAmbari               | S R1 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R1 S
+50 | nAmanArAyaNi               | S R1 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R1 S
+51 | kAmavardhini               | S R1 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R1 S
+52 | rAmapriya                  | S R1 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R1 S
+53 | gamanashrama               | S R1 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R1 S
+54 | vishvAmbhari               | S R1 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R1 S
+55 | shyAmaLAngi                | S R2 G2 M2 P D1 N1 S | S N1 D1 P M2 G2 R2 S
+56 | shanmuKapriya              | S R2 G2 M2 P D1 N2 S | S N2 D1 P M2 G2 R2 S
+57 | simHendra madhyamam        | S R2 G2 M2 P D1 N3 S | S N3 D1 P M2 G2 R2 S
+58 | HemAvathi                  | S R2 G2 M2 P D2 N2 S | S N2 D2 P M2 G2 R2 S
+59 | DharmAvathi                | S R2 G2 M2 P D2 N3 S | S N3 D2 P M2 G2 R2 S
+60 | nIthimathi                 | S R2 G2 M2 P D3 N3 S | S N3 D3 P M2 G2 R2 S
+61 | kAnthAmaNi                 | S R2 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R2 S
+62 | rishabhapriya              | S R2 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R2 S
+63 | lathAngi                   | S R2 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R2 S
+64 | vAchaspathi                | S R2 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R2 S
+65 | mEchakalyANi               | S R2 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R2 S
+66 | chithrAmbari               | S R2 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R2 S
+67 | sucharithra                | S R3 G3 M2 P D1 N1 S | S N1 D1 P M2 G3 R3 S
+68 | jyothisvarUpiNi            | S R3 G3 M2 P D1 N2 S | S N2 D1 P M2 G3 R3 S
+69 | dhAtuvardhani              | S R3 G3 M2 P D1 N3 S | S N3 D1 P M2 G3 R3 S
+70 | nAsika bhUshaNi            | S R3 G3 M2 P D2 N2 S | S N2 D2 P M2 G3 R3 S
+71 | kosalam                    | S R3 G3 M2 P D2 N3 S | S N3 D2 P M2 G3 R3 S
+72 | rasikapriya                | S R3 G3 M2 P D3 N3 S | S N3 D3 P M2 G3 R3 S`;
 
         const janyaRaw = `AHiri                | 8| S R1 S G3 M1 P D1 N2 S  | S N2 D1 P M1 G3 R1 S
 asAvEri              | 8| S R1 M1 P D1 S          | SN2SPD1M1PR1G2R1S
